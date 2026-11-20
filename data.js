@@ -2,42 +2,42 @@
 /* 題材與數值設定：品種、配方、物品、寵物、成就、天氣的名稱和數字都在這個檔案。
    之後要換題材（例如改成外星草藥），改這個檔案和 index.html 的標題就可以。 */
 var STRAINS=[
-  {id:'lazy',  name:'懶懶綠',   cost:5,   time:30,   base:17,  color:'#8fd67a', lvl:1, trait:'hardy',   tname:'好養',     tdesc:'忘記澆水也不影響品質'},
-  {id:'purple',name:'紫雲朵',   cost:15,  time:90,   base:48,  color:'#b48cf2', lvl:2, trait:'thirsty', tname:'愛喝水',   tdesc:'要澆比較多次，全程沒乾過品質運氣大增'},
-  {id:'lemon', name:'檸檬電波', cost:40,  time:240,  base:110, color:'#f2e35c', lvl:4, trait:'spark',   tname:'電波',     tdesc:'收成時讓上下左右的作物瞬間長大一截'},
-  {id:'milk',  name:'宇宙奶昔', cost:90,  time:600,  base:230, color:'#7fd8f0', lvl:6, trait:'night',   tname:'夜行',     tdesc:'晚上 6 點到早上 6 點長得快，白天長得慢'},
-  {id:'gold',  name:'黃金阿嬤', cost:200, time:1800, base:540, color:'#f5b942', lvl:9, trait:'heirloom',tname:'慢工細活', tdesc:'品質運氣高，但同一塊地連種會退步得更快'},
-  /* 以下是配種才能得到的品種，種子買不到 */
-  {id:'clover', name:'四葉懶懶', cost:0,time:45,  base:34,  color:'#5fd08a',lvl:0,gen:1,trait:'hardy lucky',         tname:'幸運',  tdesc:'不怕乾，品質運氣特別高'},
-  {id:'mint',   name:'薄荷晚霞', cost:0,time:60,  base:45,  color:'#7fe0c0',lvl:0,gen:1,trait:'hardy',               tname:'清涼',  tdesc:'不怕乾，比懶懶綠值錢'},
-  {id:'lime',   name:'青檸懶骨頭',cost:0,time:120, base:80,  color:'#c6e85c',lvl:0,gen:1,trait:'hardy spark',         tname:'懶電波',tdesc:'不怕乾，收成時帶動相鄰作物'},
-  {id:'grape',  name:'葡萄汽水', cost:0,time:180, base:125, color:'#9a6cf0',lvl:0,gen:1,trait:'thirsty spark',       tname:'氣泡',  tdesc:'愛喝水，收成時帶動相鄰作物'},
-  {id:'aurora', name:'極光雪酪', cost:0,time:420, base:240, color:'#7ff0d8',lvl:0,gen:1,trait:'spark night',         tname:'極光',  tdesc:'夜行，收成時帶動相鄰作物'},
-  {id:'moon',   name:'月光金沙', cost:0,time:1200,base:540, color:'#f0e0a0',lvl:0,gen:1,trait:'night heirloom',      tname:'月光',  tdesc:'夜行，品質運氣高，連種退步快'},
-  {id:'rainbow',name:'彩虹糖霜', cost:0,time:300, base:270, color:'#ff9ad5',lvl:0,gen:2,trait:'hardy spark lucky',   tname:'彩虹',  tdesc:'不怕乾、帶動相鄰、品質運氣高'},
-  {id:'typhoon',name:'熱帶颱風', cost:0,time:240, base:220, color:'#4fc3f7',lvl:0,gen:2,trait:'thirsty spark',       tname:'暴風',  tdesc:'愛喝水，收成時帶動相鄰作物'},
-  {id:'galaxy', name:'銀河鑽石', cost:0,time:2400,base:1300,color:'#c9d6ff',lvl:0,gen:2,trait:'night heirloom lucky',tname:'星塵',  tdesc:'夜行，品質運氣極高，連種退步快'},
-  {id:'phoenix',name:'鳳凰之淚', cost:0,time:3600,base:2800,color:'#ef4a4a',lvl:0,gen:3,trait:'lucky heirloom spark',tname:'不死鳥',tdesc:'品質運氣極高，收成時帶動相鄰作物'},
+  {id:'lazy',  name:'懶懶綠',   cost:5,   time:300,   base:17,  color:'#8fd67a', lvl:1, trait:'hardy',   tname:'好養',     tdesc:'忘記澆水也不影響品質'},
+  {id:'purple',name:'紫雲朵',   cost:15,  time:900,   base:48,  color:'#b48cf2', lvl:2, trait:'thirsty', tname:'愛喝水',   tdesc:'要澆比較多次，全程沒乾過品質運氣大增'},
+  {id:'lemon', name:'檸檬電波', cost:40,  time:2400,  base:110, color:'#f2e35c', lvl:4, trait:'spark',   tname:'電波',     tdesc:'收成時讓上下左右的作物瞬間長大一截'},
+  {id:'milk',  name:'宇宙奶昔', cost:90,  time:6000,  base:230, color:'#7fd8f0', lvl:6, trait:'night',   tname:'夜行',     tdesc:'晚上 6 點到早上 6 點長得快，白天長得慢'},
+  {id:'gold',  name:'黃金阿嬤', cost:200, time:18000, base:540, color:'#f5b942', lvl:9, trait:'heirloom',tname:'慢工細活', tdesc:'品質運氣高，但同一塊地連種會退步得更快'},
+  /* 以下是配種才能得到的品種，種子買不到。time 是成長秒數 */
+  {id:'clover', name:'四葉懶懶', cost:0,time:450,  base:34,  color:'#5fd08a',lvl:0,gen:1,trait:'hardy lucky',         tname:'幸運',  tdesc:'不怕乾，品質運氣特別高'},
+  {id:'mint',   name:'薄荷晚霞', cost:0,time:600,  base:45,  color:'#7fe0c0',lvl:0,gen:1,trait:'hardy',               tname:'清涼',  tdesc:'不怕乾，比懶懶綠值錢'},
+  {id:'lime',   name:'青檸懶骨頭',cost:0,time:1200, base:80,  color:'#c6e85c',lvl:0,gen:1,trait:'hardy spark',         tname:'懶電波',tdesc:'不怕乾，收成時帶動相鄰作物'},
+  {id:'grape',  name:'葡萄汽水', cost:0,time:1800, base:125, color:'#9a6cf0',lvl:0,gen:1,trait:'thirsty spark',       tname:'氣泡',  tdesc:'愛喝水，收成時帶動相鄰作物'},
+  {id:'aurora', name:'極光雪酪', cost:0,time:4200, base:240, color:'#7ff0d8',lvl:0,gen:1,trait:'spark night',         tname:'極光',  tdesc:'夜行，收成時帶動相鄰作物'},
+  {id:'moon',   name:'月光金沙', cost:0,time:12000,base:540, color:'#f0e0a0',lvl:0,gen:1,trait:'night heirloom',      tname:'月光',  tdesc:'夜行，品質運氣高，連種退步快'},
+  {id:'rainbow',name:'彩虹糖霜', cost:0,time:3000, base:270, color:'#ff9ad5',lvl:0,gen:2,trait:'hardy spark lucky',   tname:'彩虹',  tdesc:'不怕乾、帶動相鄰、品質運氣高'},
+  {id:'typhoon',name:'熱帶颱風', cost:0,time:2400, base:220, color:'#4fc3f7',lvl:0,gen:2,trait:'thirsty spark',       tname:'暴風',  tdesc:'愛喝水，收成時帶動相鄰作物'},
+  {id:'galaxy', name:'銀河鑽石', cost:0,time:24000,base:1300,color:'#c9d6ff',lvl:0,gen:2,trait:'night heirloom lucky',tname:'星塵',  tdesc:'夜行，品質運氣極高，連種退步快'},
+  {id:'phoenix',name:'鳳凰之淚', cost:0,time:36000,base:2800,color:'#ef4a4a',lvl:0,gen:3,trait:'lucky heirloom spark',tname:'不死鳥',tdesc:'品質運氣極高，收成時帶動相鄰作物'},
   /* 第二批配種品種 */
-  {id:'cotton', name:'雲朵棉花糖',cost:0,time:150, base:95,  color:'#f0e6ff',lvl:0,gen:1,trait:'hardy night',         tname:'軟綿',  tdesc:'不怕乾、夜行'},
-  {id:'bubble', name:'深海泡泡', cost:0,time:360, base:190, color:'#4a8fe0',lvl:0,gen:1,trait:'thirsty night',       tname:'深海',  tdesc:'愛喝水、夜行'},
-  {id:'honey',  name:'太陽蜂蜜', cost:0,time:900, base:420, color:'#ffc93c',lvl:0,gen:1,trait:'spark heirloom',      tname:'蜂蜜',  tdesc:'帶動相鄰作物，品質運氣高，連種退步快'},
-  {id:'lavender',name:'薰衣草奶茶',cost:0,time:600,base:300, color:'#c3a6f5',lvl:0,gen:1,trait:'thirsty lucky',       tname:'香氣',  tdesc:'愛喝水，品質運氣高'},
-  {id:'cocoa',  name:'午夜可可', cost:0,time:480, base:250, color:'#8a5a44',lvl:0,gen:1,trait:'night lucky',         tname:'可可',  tdesc:'夜行，品質運氣高'},
-  {id:'dream',  name:'夢遊綿羊', cost:0,time:360, base:330, color:'#fff6d8',lvl:0,gen:2,trait:'hardy night lucky',   tname:'好夢',  tdesc:'不怕乾、夜行、品質運氣高'},
-  {id:'coral',  name:'珊瑚汽泡', cost:0,time:720, base:520, color:'#ff7f7f',lvl:0,gen:2,trait:'thirsty spark',       tname:'珊瑚',  tdesc:'愛喝水，帶動相鄰作物'},
-  {id:'eclipse',name:'日蝕金冠', cost:0,time:1800,base:1100,color:'#5a3a8a',lvl:0,gen:2,trait:'night heirloom spark',tname:'日蝕',  tdesc:'夜行，品質運氣高，帶動相鄰作物'},
-  {id:'teatime',name:'午後花園', cost:0,time:900, base:600, color:'#9fe0a0',lvl:0,gen:2,trait:'hardy lucky',         tname:'午茶',  tdesc:'不怕乾，品質運氣高'},
-  {id:'abyss',  name:'深淵龍鬚', cost:0,time:3000,base:2400,color:'#2fb8a8',lvl:0,gen:3,trait:'thirsty night lucky', tname:'深淵',  tdesc:'愛喝水、夜行、品質運氣極高'},
-  {id:'skygarden',name:'天空樹', cost:0,time:2700,base:2200,color:'#b8f0ff',lvl:0,gen:3,trait:'hardy lucky spark',   tname:'天空',  tdesc:'不怕乾、品質運氣高、帶動相鄰作物'},
-  {id:'cosmos', name:'宇宙之心', cost:0,time:5400,base:6000,color:'#ff5ad0',lvl:0,gen:4,trait:'lucky heirloom spark night',tname:'宇宙',tdesc:'夜行，品質運氣極高，帶動相鄰作物'},
+  {id:'cotton', name:'雲朵棉花糖',cost:0,time:1500, base:95,  color:'#f0e6ff',lvl:0,gen:1,trait:'hardy night',         tname:'軟綿',  tdesc:'不怕乾、夜行'},
+  {id:'bubble', name:'深海泡泡', cost:0,time:3600, base:190, color:'#4a8fe0',lvl:0,gen:1,trait:'thirsty night',       tname:'深海',  tdesc:'愛喝水、夜行'},
+  {id:'honey',  name:'太陽蜂蜜', cost:0,time:9000, base:420, color:'#ffc93c',lvl:0,gen:1,trait:'spark heirloom',      tname:'蜂蜜',  tdesc:'帶動相鄰作物，品質運氣高，連種退步快'},
+  {id:'lavender',name:'薰衣草奶茶',cost:0,time:6000,base:300, color:'#c3a6f5',lvl:0,gen:1,trait:'thirsty lucky',       tname:'香氣',  tdesc:'愛喝水，品質運氣高'},
+  {id:'cocoa',  name:'午夜可可', cost:0,time:4800, base:250, color:'#8a5a44',lvl:0,gen:1,trait:'night lucky',         tname:'可可',  tdesc:'夜行，品質運氣高'},
+  {id:'dream',  name:'夢遊綿羊', cost:0,time:3600, base:330, color:'#fff6d8',lvl:0,gen:2,trait:'hardy night lucky',   tname:'好夢',  tdesc:'不怕乾、夜行、品質運氣高'},
+  {id:'coral',  name:'珊瑚汽泡', cost:0,time:7200, base:520, color:'#ff7f7f',lvl:0,gen:2,trait:'thirsty spark',       tname:'珊瑚',  tdesc:'愛喝水，帶動相鄰作物'},
+  {id:'eclipse',name:'日蝕金冠', cost:0,time:18000,base:1100,color:'#5a3a8a',lvl:0,gen:2,trait:'night heirloom spark',tname:'日蝕',  tdesc:'夜行，品質運氣高，帶動相鄰作物'},
+  {id:'teatime',name:'午後花園', cost:0,time:9000, base:600, color:'#9fe0a0',lvl:0,gen:2,trait:'hardy lucky',         tname:'午茶',  tdesc:'不怕乾，品質運氣高'},
+  {id:'abyss',  name:'深淵龍鬚', cost:0,time:30000,base:2400,color:'#2fb8a8',lvl:0,gen:3,trait:'thirsty night lucky', tname:'深淵',  tdesc:'愛喝水、夜行、品質運氣極高'},
+  {id:'skygarden',name:'天空樹', cost:0,time:27000,base:2200,color:'#b8f0ff',lvl:0,gen:3,trait:'hardy lucky spark',   tname:'天空',  tdesc:'不怕乾、品質運氣高、帶動相鄰作物'},
+  {id:'cosmos', name:'宇宙之心', cost:0,time:54000,base:6000,color:'#ff5ad0',lvl:0,gen:4,trait:'lucky heirloom spark night',tname:'宇宙',tdesc:'夜行，品質運氣極高，帶動相鄰作物'},
   /* 合作配種才拿得到 */
-  {id:'friendleaf',name:'友情草',  cost:0,time:180,base:160,color:'#ffb3c7',lvl:0,gen:1,coop:1,trait:'hardy lucky',      tname:'友情',  tdesc:'和朋友合作配種才拿得到，不怕乾、品質運氣高'},
-  {id:'twinstar',  name:'雙子星雲',cost:0,time:900,base:900,color:'#9fe3ff',lvl:0,gen:2,coop:1,trait:'night spark lucky',tname:'雙子星',tdesc:'兩個配種品種合作才配得出，夜行、帶動相鄰、品質運氣高'},
+  {id:'friendleaf',name:'友情草',  cost:0,time:1800,base:160,color:'#ffb3c7',lvl:0,gen:1,coop:1,trait:'hardy lucky',      tname:'友情',  tdesc:'和朋友合作配種才拿得到，不怕乾、品質運氣高'},
+  {id:'twinstar',  name:'雙子星雲',cost:0,time:9000,base:900,color:'#9fe3ff',lvl:0,gen:2,coop:1,trait:'night spark lucky',tname:'雙子星',tdesc:'兩個配種品種合作才配得出，夜行、帶動相鄰、品質運氣高'},
   /* 限時活動才買得到種子 */
-  {id:'maple',  name:'楓糖草',cost:30,time:120,base:75, color:'#d9822b',lvl:1,ev:'autumn',trait:'lucky',      tname:'秋收',tdesc:'品質運氣高，只有秋收祭期間買得到種子'},
-  {id:'snow',   name:'雪花糖',cost:50,time:300,base:150,color:'#e8f4ff',lvl:1,ev:'xmas',  trait:'night hardy',tname:'雪夜',tdesc:'夜行、不怕乾，只有聖誕節期間買得到種子'},
-  {id:'hongbao',name:'紅包草',cost:88,time:600,base:288,color:'#e83a3a',lvl:1,ev:'lny',   trait:'lucky spark',tname:'好運',tdesc:'品質運氣高、帶動相鄰，只有春節期間買得到種子'}
+  {id:'maple',  name:'楓糖草',cost:30,time:1200,base:75, color:'#d9822b',lvl:1,ev:'autumn',trait:'lucky',      tname:'秋收',tdesc:'品質運氣高，只有秋收祭期間買得到種子'},
+  {id:'snow',   name:'雪花糖',cost:50,time:3000,base:150,color:'#e8f4ff',lvl:1,ev:'xmas',  trait:'night hardy',tname:'雪夜',tdesc:'夜行、不怕乾，只有聖誕節期間買得到種子'},
+  {id:'hongbao',name:'紅包草',cost:88,time:6000,base:288,color:'#e83a3a',lvl:1,ev:'lny',   trait:'lucky spark',tname:'好運',tdesc:'品質運氣高、帶動相鄰，只有春節期間買得到種子'}
 ];
 var QMULT=[1,1.3,1.8,2.6,4,8];
 var RECIPES=[
@@ -178,7 +178,7 @@ ACH.push(
 var CLOUD={url:'https://jsjjqieyizonghogafrl.supabase.co',key:'sb_publishable_ltN1Rso7c258EKLRZBtUEw_O_SYfwzu'};
 /* 限時活動：from/to 是台灣日期（含頭尾），weekly 是星期幾（0 是星期日） */
 var EVENTS_CAL=[
-  {id:'autumn', name:'秋收祭',  from:'2026-11-15',to:'2026-11-30',desc:'收成經驗 +50%；種子行限定「楓糖草」，雜貨店限定「南瓜燈」',xp:1.5},
+  {id:'autumn', name:'秋收祭',  from:'2026-11-15',to:'2026-11-30',desc:'收成經驗 +50%；商店限定「楓糖草」和「南瓜燈」',xp:1.5},
   {id:'xmas',   name:'聖誕節',  from:'2026-12-20',to:'2026-12-31',desc:'市場售價 +20%；限定「雪花糖」和「聖誕樹」',sell:1.2},
   {id:'lny',    name:'春節',    from:'2027-02-05',to:'2027-02-20',desc:'每天第一次收成送 88 金幣紅包；限定「紅包草」和「春聯」',hongbao:88},
   {id:'weekend',name:'週末市集',weekly:[6,0],desc:'週六、週日市場售價 +10%',sell:1.1}

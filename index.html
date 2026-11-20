@@ -12,28 +12,25 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <title>懶草農場</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 
 </head>
 <body>
 <div id="app">
   <div id="hud">
-    <div class="stat"><b id="coins">0</b><small id="repl">金幣</small></div>
-    <div class="stat" id="xpwrap">
-      <b id="lvl">LV 1</b>
-      <div id="xpbar"><div id="xpfill"></div></div>
-    </div>
-    <button id="seedchip" type="button"><i id="seedsw"></i><span id="seedname"></span></button>
+    <div class="hstat" id="hcoin"><img id="i_coin" alt=""><b id="coins">0</b></div>
+    <div class="hstat" id="hrep"><img id="i_rep" alt=""><b id="rep">0</b></div>
+    <div id="xpwrap"><div id="lvl"></div><div id="xpbar"><div id="xpfill"></div></div></div>
+    <div id="wx"></div>
   </div>
-  <div id="stage"><canvas id="cv" width="160" height="200"></canvas><div id="labels"></div><div id="wx"></div></div>
-  <div id="panel"><header><h2 id="ptitle"></h2><span id="psub"></span><button type="button" id="pclose" class="btn ghost" style="min-width:0;padding:6px 10px">關閉</button></header><div id="plist"></div></div>
+  <div id="stage"><canvas id="cv" width="160" height="200"></canvas><div id="labels"></div><div id="picker"></div></div>
+  <div id="panel"><header><div><h2 id="ptitle"></h2><span id="psub"></span></div><button type="button" id="pclose" aria-label="關閉">✕</button></header><div id="plist"></div></div>
   <div id="tabs">
-    <button type="button" data-tab="seeds">種子</button>
-    <button type="button" data-tab="bag">背包</button>
-    <button type="button" data-tab="pets">寵物</button>
-    <button type="button" data-tab="ach">任務</button>
-    <button type="button" id="go">去小鎮</button>
-    <button type="button" data-tab="upg">更多</button>
+    <button type="button" data-tab="bag"><img alt="" data-ti="bag"><span>背包</span><em id="b_bag"></em></button>
+    <button type="button" data-tab="pets"><img alt="" data-ti="paw"><span>寵物</span><em id="b_pets"></em></button>
+    <button type="button" data-tab="ach"><img alt="" data-ti="scroll"><span>任務</span><em id="b_ach"></em></button>
+    <button type="button" id="go"><img alt="" data-ti="town" id="goicon"><span id="golbl">去小鎮</span></button>
+    <button type="button" data-tab="upg"><img alt="" data-ti="menu"><span>更多</span><em id="b_upg"></em></button>
   </div>
   <div id="toast"></div>
   <div id="modal"><div id="mbox"><canvas id="mart" width="12" height="10"></canvas><h3 id="mtitle"></h3><div id="mbody"></div><div id="mbtns"></div></div></div>
@@ -41,8 +38,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="data.js?v=16"></script>
-<script src="game.js?v=16"></script>
+<script src="data.js?v=17"></script>
+<script src="game.js?v=17"></script>
 
 </body>
 </html>
