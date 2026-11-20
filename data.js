@@ -118,3 +118,22 @@ var STORIES={
     {t:'「母星有個傳說：彩虹糖霜遇上銀河鑽石，會生出不死的鳥。」',hint:'phoenix',rep:8},
     {t:'「我要回去了，這個留給你。它在晚上長得特別好。」',seed:'aurora',n:2,rep:12}]
 };
+/* 小鎮土地上可以蓋的建築：per 是每格的建造費 */
+var BUILDINGS=[
+  {id:'green', name:'溫室',per:150,c:'#7fd8f0',desc:'自動長出作物，每 10 格每小時 1 株，最多累積 8 小時'},
+  {id:'inn',   name:'民宿',per:200,c:'#ee9a72',desc:'收租金，每格每小時 10 金幣，最多累積 8 小時'},
+  {id:'garden',name:'花園',per:100,c:'#ef7a8a',desc:'每 5 格讓農場魅力 +1（所有花園合計最多 +30）'}
+];
+/* 釣魚：w 是上鉤機率的權重 */
+var FISH=[{id:'fish1',w:50,c:'#9a8fb8'},{id:'fish2',w:28,c:'#f4f1ea'},{id:'fish3',w:15,c:'#5aa0f2'},{id:'fish4',w:5.5,c:'#b06cf0'},{id:'fish5',w:1.5,c:'#f5c451'}];
+ITEMS.push(
+  {id:'fish1',name:'小溪魚',rar:0,value:20,  desc:'池塘裡最常見的小魚。'},
+  {id:'fish2',name:'鯉魚',  rar:1,value:60,  desc:'肥肥的，阿嬤說可以煮湯。'},
+  {id:'fish3',name:'金魚',  rar:2,value:180, desc:'不知道誰放生的。'},
+  {id:'fish4',name:'錦鯉',  rar:3,value:600, desc:'身上的花紋像一幅畫。'},
+  {id:'fish5',name:'龍魚',  rar:4,value:2500,desc:'傳說釣到的人會走運一整年。'}
+);
+ACH.push(
+  {id:'land3', name:'包租公',   desc:'在小鎮買下 3 塊地',reward:2000,ok:function(s){return Object.keys(s.land||{}).length>=3;}},
+  {id:'dragon',name:'釣魚高手', desc:'釣到一條龍魚',     reward:3000,ok:function(s){return (s.items||{}).fish5!==undefined;}}
+);

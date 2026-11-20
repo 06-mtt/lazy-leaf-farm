@@ -49,6 +49,7 @@ function normalize(){
   S.items=S.items||{}; S.pets=S.pets||{}; S.sat=S.sat||{}; S.dex=S.dex||{}; S.tasks=S.tasks||[]; S.charm=S.charm||0;
   if(!S.nextTask) S.nextTask=Date.now()+60000;
   S.stats.tasks=S.stats.tasks||0; S.stats.best=S.stats.best||0;
+  S.land=S.land||{};
   S.rep=S.rep||0; S.contest=S.contest||null; S.story=S.story||{}; S.hint=S.hint||{};
   S.decor=S.decor||{}; S.look=S.look||{hat:'straw',shirt:'red'}; S.wardrobe=S.wardrobe||{straw:1,none:1,red:1}; S.dexInfo=S.dexInfo||{};
   S.seeds=S.seeds||{}; S.known=S.known||{}; S.goods=S.goods||[]; S.favor=S.favor||{}; S.job=S.job||null;
@@ -68,7 +69,11 @@ function price(s,now){
   var mult=0.7+0.8*rnd(bucket*31+s.idx*7+1);
   return Math.max(1,Math.round(s.base*mult*(1+0.1*S.upg.speaker)*(inSeason(s,now)?1.15:1)*(1+0.01*charmPts())));
 }
-function charmPts(){ return DECOR.reduce(function(a,x){ return a+(S.decor[x.id]?x.charm:0); },0); }
+function charmPts(){
+  var g=0; Object.keys(S.land).forEach(function(k){ var o=S.land[k], l=LOTMAP[k]; if(o.b==='garden'&&l) g+=Math.floor(l.sw*l.sh/5); });
+  return DECOR.reduce(function(a,x){ return a+(S.decor[x.id]?x.charm:0); },0)+Math.min(30,g);
+}
+function landYield(l,o,now){ var hrs=Math.min(8,(now-o.t)/3600000), area=l.sw*l.sh; return o.b==='inn'?Math.floor(hrs*area*10):(o.b==='green'?Math.floor(hrs*area/10):0); }
 function week(now){ return Math.floor(now/604800000); }
 function contestStrain(w){ var b=STRAINS.filter(function(x){return !x.gen;}); return b[Math.floor(rnd(w*5+2)*b.length)]; }
 function npcEntries(w){ return NPCS.map(function(n,i){ return {name:n,q:Math.min(5,Math.floor(Math.pow(rnd(w*13+i*7+1),2.2)*5.3))}; }); }
@@ -194,6 +199,7 @@ function icon(b){
 }
 var ICON={};
 STRAINS.forEach(function(s){ ICON[s.id]=icon({rows:BUD,pal:{c:s.color,d:shade(s.color,0.7),g:'#6fbf5f',w:'#ffffff',s:'#3f8f4a'}}); });
+FISH.forEach(function(f){ BMP[f.id]={rows:['............','...ccc......','..cccccc..c.','.ccwccccccc.','.cckcccccc..','..cccccc..c.','...ccc......'],pal:{c:f.c,w:'#ffffff',k:'#2a2148'}}; });
 ITEMS.forEach(function(it){ ICON[it.id]=icon(BMP[it.id]); });
 PETS.forEach(function(p){ ICON['pet_'+p.id]=icon(BMP[p.id]); });
 BMP.juice={rows:['.......ww...','......w.....','..gggggggg..','..gjjjjjjg..','..gjjjjjjg..','..gjjwjjjg..','..gjjjjjjg..','...gjjjjg...','...gggggg...'],pal:{w:'#f6e7c8',g:'#cfe8e8',j:'#f5a742'}};
@@ -295,45 +301,85 @@ function draw(t){
   }
 }
 
-/* ---------- 小鎮：俯視地圖。4×4 個街區、96 塊小地，每塊地點了可以進入或查看；待售的地之後留給朋友 ---------- */
-var scene='farm', VR=[7,123,239,355,471], HR=[7,91,175,259,343], TW=478, TH=350, curLot=null;
-var SPECIAL={
-  '1,1,1,1':{id:'farm',  type:'farm', name:'你的農場'},
-  '1,1,1,2':{id:'seeds', type:'shop', name:'種子行',tab:'seeds', roof:'#6f9a6a',ridge:'#8fbf8a',icon:'bud'},
-  '2,1,1,0':{id:'market',type:'shop', name:'市場',  tab:'market',roof:'#c98a5a',ridge:'#e0a878',icon:'star'},
-  '2,1,1,1':{id:'lab',   type:'shop', name:'工坊',  tab:'lab',   roof:'#7a6fa8',ridge:'#9a8fc8',icon:'juice'},
-  '1,2,0,1':{id:'pets',  type:'shop', name:'寵物店',tab:'pets',  roof:'#d9a05a',ridge:'#f0c080',icon:'cat'},
-  '2,2,0,0':{id:'land',  type:'shop', name:'地政所',tab:'land',  roof:'#8f9ab8',ridge:'#b0bad8',icon:'deed'},
-  '1,2,0,2':{id:'board', type:'board',name:'公告欄',tab:'ach'},
-  '1,1,0,1':{id:'decor',type:'shop', name:'雜貨店',tab:'decor', roof:'#8a9a5a',ridge:'#b8c88a',icon:'lampi'},
-  '2,1,0,1':{id:'wear', type:'shop', name:'服飾店',tab:'wear',  roof:'#d97a9a',ridge:'#f0a8c0',icon:'hat'},
-  '2,2,1,1':{id:'dex',  type:'shop', name:'圖鑑館',tab:'dex',   roof:'#5e7a9a',ridge:'#8fb0d0',icon:'book'},
-  '1,2,1,1':{id:'contest',type:'shop',name:'品評會場',tab:'contest',roof:'#a8862f',ridge:'#f5c451',icon:'cup'},
-  '1,1,1,0':{type:'home',name:'阿嬤家',  npc:'隔壁阿嬤',  roof:'#b48cf2',ridge:'#d9c0ff',desc:'門口曬著一排醃菜。'},
-  '2,2,0,1':{type:'home',name:'派出所',  npc:'警察杯杯',  roof:'#4a6fd0',ridge:'#8aa6f0',desc:'門口停著一台腳踏車。'},
-  '1,2,0,0':{type:'home',name:'早餐店',  npc:'早餐店老闆',roof:'#ee9a72',ridge:'#ffc8a8',desc:'一大早就飄出蛋餅香。'},
-  '2,1,1,2':{type:'home',name:'土地公廟',npc:'廟口里長',  roof:'#c8647a',ridge:'#f5c451',desc:'里長每天在這裡泡茶。'},
-  '2,2,0,2':{type:'home',name:'星際民宿',npc:'外星觀光客',roof:'#7fd8f0',ridge:'#c8f2ff',desc:'屋頂上停著一台小飛碟。'}
-};
-var LOTS=[];
+/* ---------- 小鎮：俯視大地圖。道路有斜的、有彎的；有功能的地是大塊，其他是小塊。
+   小塊的地在地圖上一樣大，點進去才看得到實際大小；離市中心越近、面積越大就越貴 ---------- */
+var scene='farm', TW=956, TH=700, CX=478, CY=350, curLot=null;
+var ROADS=[
+  [20,60,936,60],[20,350,936,350],[20,640,936,640],[20,60,20,640],[936,60,936,640],
+  [120,60,120,640],[478,60,478,640],[840,60,840,640],
+  [120,200,660,200],[300,60,300,200],[200,500,840,500],[660,200,660,640],[360,350,360,500],[200,500,200,640],[20,470,120,470],
+  [300,200,478,350],[478,350,660,500],[840,60,660,200],[120,640,200,500],[660,200,740,270],[740,270,840,270]
+];
+function distPS(x,y,r){
+  var dx=r[2]-r[0], dy=r[3]-r[1], t=((x-r[0])*dx+(y-r[1])*dy)/(dx*dx+dy*dy); t=Math.max(0,Math.min(1,t));
+  var qx=r[0]+dx*t, qy=r[1]+dy*t; return {d:Math.sqrt((x-qx)*(x-qx)+(y-qy)*(y-qy)),pt:[qx,qy]};
+}
+function nearestRoad(x,y){ var b={d:1e9,pt:null}; for(var i=0;i<ROADS.length;i++){ var q=distPS(x,y,ROADS[i]); if(q.d<b.d) b=q; } return b; }
+/* 路網：把道路在交叉點切開，變成節點和線段，角色沿著線段走 */
+var NODES=[], EDGES=[];
 (function(){
-  var n=0, ROOFS=['#b8566a','#8f6a4a','#5e7a9a','#7a8a5a','#9a6a8a'];
-  for(var by=0;by<4;by++) for(var bx=0;bx<4;bx++) for(var row=0;row<2;row++) for(var col=0;col<3;col++){
-    var x=VR[bx]+10+col*33, y=row?HR[by+1]-39:HR[by]+11, l={n:n,x:x,y:y,w:30,h:28,row:row,door:[x+15,row?HR[by+1]:HR[by]]}, sp=SPECIAL[bx+','+by+','+row+','+col], k;
-    if(sp){ for(k in sp) l[k]=sp[k]; l.label=1; }
-    else {
-      var r=rnd(n*7.3+1), edge=(bx===0||bx===3||by===0||by===3);
-      if(r<(edge?0.3:0.45)){ l.type='sale'; l.name='待售地 '+(n+1)+' 號'; l.price=1500+Math.round(rnd(n+5)*40)*100; }
-      else if(r<(edge?0.55:0.8)){ l.type='house'; l.name='民宅 '+(n+1)+' 號'; l.roof=ROOFS[n%5]; l.ridge='#e6dcf0'; }
-      else if(r<0.93){ l.type='woods'; l.name='小樹林'; }
-      else { l.type='pond'; l.name='小池塘'; }
-    }
-    LOTS.push(l); n++;
+  function inter(a,b){
+    var x1=a[0],y1=a[1],x2=a[2],y2=a[3],x3=b[0],y3=b[1],x4=b[2],y4=b[3], den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+    if(Math.abs(den)<1e-6) return null;
+    var t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den, u=-((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/den;
+    return (t>-0.002&&t<1.002&&u>-0.002&&u<1.002)?[x1+t*(x2-x1),y1+t*(y2-y1)]:null;
+  }
+  function node(p){ for(var i=0;i<NODES.length;i++) if(Math.abs(NODES[i][0]-p[0])<1.5&&Math.abs(NODES[i][1]-p[1])<1.5) return i; NODES.push([Math.round(p[0]),Math.round(p[1])]); return NODES.length-1; }
+  var pts=ROADS.map(function(r){ return [[r[0],r[1]],[r[2],r[3]]]; }), i, j;
+  for(i=0;i<ROADS.length;i++) for(j=i+1;j<ROADS.length;j++){ var p=inter(ROADS[i],ROADS[j]); if(p){ pts[i].push(p); pts[j].push(p); } }
+  ROADS.forEach(function(r,k){
+    var dx=r[2]-r[0], dy=r[3]-r[1], prev=-1;
+    pts[k].sort(function(a,b){ return ((a[0]-r[0])*dx+(a[1]-r[1])*dy)-((b[0]-r[0])*dx+(b[1]-r[1])*dy); });
+    pts[k].forEach(function(p){ var n=node(p); if(prev>=0&&prev!==n){ var A=NODES[prev], B=NODES[n]; EDGES.push({a:prev,b:n,len:Math.sqrt((A[0]-B[0])*(A[0]-B[0])+(A[1]-B[1])*(A[1]-B[1]))}); } prev=n; });
+  });
+})();
+/* 有功能的地（大塊）。row 1 表示在馬路北側、門口朝南 */
+var FUNC=[
+  {id:'farm',  type:'farm', name:'你的農場',x:488,y:312,row:1},
+  {id:'seeds', type:'shop', name:'種子行',  x:521,y:312,row:1,tab:'seeds', roof:'#6f9a6a',ridge:'#8fbf8a',icon:'bud'},
+  {id:'market',type:'shop', name:'市場',    x:554,y:312,row:1,tab:'market',roof:'#c98a5a',ridge:'#e0a878',icon:'star'},
+  {id:'lab',   type:'shop', name:'工坊',    x:587,y:312,row:1,tab:'lab',   roof:'#7a6fa8',ridge:'#9a8fc8',icon:'juice'},
+  {id:'wear',  type:'shop', name:'服飾店',  x:620,y:312,row:1,tab:'wear',  roof:'#d97a9a',ridge:'#f0a8c0',icon:'hat'},
+  {id:'pets',  type:'shop', name:'寵物店',  x:438,y:360,row:0,tab:'pets',  roof:'#d9a05a',ridge:'#f0c080',icon:'cat'},
+  {id:'land',  type:'shop', name:'地政所',  x:405,y:360,row:0,tab:'land',  roof:'#8f9ab8',ridge:'#b0bad8',icon:'deed'},
+  {id:'board', type:'board',name:'公告欄',  x:372,y:360,row:0,tab:'ach'},
+  {id:'contest',type:'shop',name:'品評會場',x:320,y:360,row:0,tab:'contest',roof:'#a8862f',ridge:'#f5c451',icon:'cup'},
+  {id:'dex',   type:'shop', name:'圖鑑館',  x:287,y:360,row:0,tab:'dex',   roof:'#5e7a9a',ridge:'#8fb0d0',icon:'book'},
+  {id:'decor', type:'shop', name:'雜貨店',  x:254,y:360,row:0,tab:'decor', roof:'#8a9a5a',ridge:'#b8c88a',icon:'lampi'},
+  {type:'home',name:'阿嬤家',  x:380,y:312,row:1,npc:'隔壁阿嬤',  roof:'#b48cf2',ridge:'#d9c0ff',desc:'門口曬著一排醃菜。'},
+  {type:'home',name:'派出所',  x:347,y:312,row:1,npc:'警察杯杯',  roof:'#4a6fd0',ridge:'#8aa6f0',desc:'門口停著一台腳踏車。'},
+  {type:'home',name:'早餐店',  x:314,y:312,row:1,npc:'早餐店老闆',roof:'#ee9a72',ridge:'#ffc8a8',desc:'一大早就飄出蛋餅香。'},
+  {type:'home',name:'土地公廟',x:542,y:360,row:0,npc:'廟口里長',  roof:'#c8647a',ridge:'#f5c451',desc:'里長每天在這裡泡茶。'},
+  {type:'home',name:'星際民宿',x:575,y:360,row:0,npc:'外星觀光客',roof:'#7fd8f0',ridge:'#c8f2ff',desc:'屋頂上停著一台小飛碟。'}
+];
+var LOTS=[], LOTMAP={};
+(function(){
+  var SIZES=[[2,2],[2,3],[3,3],[3,3],[3,4],[4,4],[4,5],[5,5],[6,6]], ROOFS=['#b8566a','#8f6a4a','#5e7a9a','#7a8a5a','#9a6a8a'], idx=0;
+  FUNC.forEach(function(f,i){ f.n='f'+i; f.w=30; f.h=28; f.label=1; f.door=nearestRoad(f.x+15,f.y+14).pt; LOTS.push(f);
+    if(nearestRoad(f.x+15,f.y+14).d<16||nearestRoad(f.x,f.y).d<8||nearestRoad(f.x+30,f.y).d<8||nearestRoad(f.x,f.y+28).d<8||nearestRoad(f.x+30,f.y+28).d<8) console.warn('lot too close to a road: '+f.name); });
+  for(var gy=10;gy<TH-20;gy+=16) for(var gx=10;gx<TW-20;gx+=17){
+    var n=idx++, cx=gx+7.5, cy=gy+7, nr=nearestRoad(cx,cy), k, ok=true;
+    if(nr.d>46||nr.d<15) continue;
+    for(k=0;k<FUNC.length;k++) if(gx<FUNC[k].x+32&&gx+15>FUNC[k].x-2&&gy<FUNC[k].y+30&&gy+14>FUNC[k].y-2){ ok=false; break; }
+    if(!ok) continue;
+    if((cx-750)*(cx-750)/3844+(cy-425)*(cy-425)/1521<1) continue;
+    var P=[[gx,gy],[gx+15,gy],[gx,gy+14],[gx+15,gy+14],[cx,gy],[cx,gy+14],[gx,cy],[gx+15,cy]];
+    for(k=0;k<8;k++) if(nearestRoad(P[k][0],P[k][1]).d<9){ ok=false; break; }
+    if(!ok) continue;
+    var c=1-Math.min(1,Math.sqrt((cx-CX)*(cx-CX)+(cy-CY)*(cy-CY))/520), r=rnd(n*3.7+2), sz=SIZES[Math.floor(rnd(n*1.9+7)*SIZES.length)];
+    var l={n:n,x:gx,y:gy,w:15,h:14,small:1,door:nr.pt,c:c,sw:sz[0],sh:sz[1]};
+    if(r<0.36){ l.type='sale'; l.name='土地 '+n+' 號'; l.price=Math.round((800+9000*c*c)*sz[0]*sz[1]/9/100)*100; }
+    else if(r<0.6+0.25*c){ l.type='house'; l.name='民宅 '+n+' 號'; l.roof=ROOFS[n%5]; l.ridge='#e6dcf0'; }
+    else if(r<0.97){ l.type='woods'; l.name='小樹林'; }
+    else { l.type='pond'; l.name='小池塘'; }
+    LOTS.push(l); LOTMAP[n]=l;
   }
 })();
-var FARMLOT=LOTS.filter(function(l){return l.id==='farm';})[0];
+var FARMLOT=LOTS[0];
 var town={x:FARMLOT.door[0],y:FARMLOT.door[1],dir:1,pending:null,path:[],cx:0,cy:0,step:0};
-var NPC=[{x:200,y:HR[2]-5,ax:'x',dir:1,sp:9,c:{hair:'#e6e0f0',skin:'#f2c9a0',shirt:'#b48cf2',pants:'#5e4a82'}},{x:VR[2]+5,y:200,ax:'y',dir:-1,sp:12,c:{hat:'#4a6fd0',skin:'#f2c9a0',shirt:'#4a6fd0',pants:'#2a2148'}}];
+var NPC=[{x:300,y:345,ax:'x',lo:30,hi:920,dir:1,sp:9,c:{hair:'#e6e0f0',skin:'#f2c9a0',shirt:'#b48cf2',pants:'#5e4a82'}},{x:483,y:200,ax:'y',lo:70,hi:630,dir:-1,sp:12,c:{hat:'#4a6fd0',skin:'#f2c9a0',shirt:'#4a6fd0',pants:'#2a2148'}}];
+var fish={st:'idle',msg:'',t1:0,t2:0};
+function fishReset(){ clearTimeout(fish.t1); clearTimeout(fish.t2); fish.st='idle'; fish.msg=''; }
 var ME={};
 function syncLook(){
   var h=HATS.filter(function(x){return x.id===S.look.hat;})[0]||HATS[0], sh=SHIRTS.filter(function(x){return x.id===S.look.shirt;})[0]||SHIRTS[0];
@@ -386,93 +432,134 @@ function updateLabels(){
 }
 function tree(x,y){ px(x+1,y,4,6,'#2f6b45'); px(x,y+1,6,4,'#2f6b45'); px(x+1,y+1,2,2,'#4f9a62'); }
 function outline(X,Y,w,h,c){ px(X,Y,w,1,c); px(X,Y+h-1,w,1,c); px(X,Y,1,h,c); px(X+w-1,Y,1,h,c); }
-function drawLot(l,t){
-  var X=l.x-Math.round(town.cx), Y=l.y-Math.round(town.cy), k, ty=l.type;
-  if(X>W||Y>H||X+30<0||Y+28<0) return;
-  if(ty==='shop'||ty==='home'||ty==='house'){
+function drawBig(l,t,ox,oy){
+  var X=l.x-ox, Y=l.y-oy, k, ty=l.type;
+  if(ty==='shop'||ty==='home'){
     var by=l.row?Y+3:Y+8;
-    px(X,Y,30,28,ty==='house'?'#5f9068':'#c9bfd8'); if(ty!=='house') outline(X,Y,30,28,'#9a8fb8');
+    px(X,Y,30,28,'#c9bfd8'); outline(X,Y,30,28,'#9a8fb8');
     if(l.row) px(X+13,by+17,4,Y+28-by-17,'#f0e8f6'); else px(X+13,Y,4,by-Y,'#f0e8f6');
     ctx.fillStyle='rgba(42,33,72,.35)'; ctx.fillRect(X+5,by+1,22,17);
     px(X+4,by,22,17,l.roof); px(X+4,by,22,1,l.ridge); px(X+4,by+8,22,1,l.ridge); px(X+21,by+2,3,3,'#3a2433');
     if(l.icon){ var ic=BMP[l.icon]; px(X+8,by+2,14,13,'#2a2148'); bmp(ctx,ic,X+15-Math.floor(ic.rows[0].length/2),by+8-Math.floor(ic.rows.length/2)); }
   } else if(ty==='farm'){
     px(X,Y,30,28,'#5c8c66'); outline(X,Y,30,28,Math.floor(t/500)%2?'#f5c451':'#c9a27a');
-    px(X+13,Y+24,4,4,'#b08a66'); px(X+3,Y+4,9,8,'#b8566a'); px(X+3,Y+7,9,1,'#d97a8a');
+    px(X+13,Y+24,4,4,'#b08a66'); px(X+3,Y+4,9,8,S.decor.goldroof?'#f5c451':'#b8566a'); px(X+3,Y+7,9,1,'#d97a8a');
     for(k=0;k<9;k++){
       var p=S.plots[k], qx=X+13+(k%3)*5, qy=Y+4+Math.floor(k/3)*6;
       if(!p.u){ px(qx,qy,4,5,'#456a52'); continue; }
       px(qx,qy,4,5,'#7a5644');
-      if(p.crop){ var st=SMAP[p.crop], ripe=p.prog>=st.time; px(qx+1,qy+1,2,3,ripe?st.color:'#6fbf5f'); }
+      if(p.crop){ var st=SMAP[p.crop]; px(qx+1,qy+1,2,3,p.prog>=st.time?st.color:'#6fbf5f'); }
     }
     tree(X+4,Y+16);
-  } else if(ty==='sale'){
-    px(X,Y,30,28,'#7d9a6a');
-    for(k=0;k<30;k+=6){ px(X+k,Y,3,1,'#f6e7c8'); px(X+k,Y+27,3,1,'#f6e7c8'); }
-    for(k=0;k<28;k+=6){ px(X,Y+k,1,3,'#f6e7c8'); px(X+29,Y+k,1,3,'#f6e7c8'); }
-    px(X+14,Y+16,2,6,'#b08a66'); px(X+9,Y+9,12,8,'#f6e7c8'); px(X+11,Y+11,8,1,'#c8647a'); px(X+11,Y+13,5,1,'#c8647a');
-  } else if(ty==='woods'){
-    px(X,Y,30,28,'#4a7a58'); tree(X+3,Y+3); tree(X+13,Y+2); tree(X+22,Y+5); tree(X+6,Y+13); tree(X+17,Y+12); tree(X+11,Y+20); tree(X+22,Y+19);
-  } else if(ty==='pond'){
-    px(X,Y,30,28,'#5f9068'); px(X+5,Y+6,20,15,'#5aa0c8'); px(X+5,Y+6,2,2,'#5f9068'); px(X+23,Y+6,2,2,'#5f9068'); px(X+5,Y+19,2,2,'#5f9068'); px(X+23,Y+19,2,2,'#5f9068'); px(X+9,Y+10,6,1,'#bfe4f4'); px(X+15,Y+16,5,1,'#bfe4f4'); tree(X+1,Y+20);
   } else {
     px(X,Y,30,28,'#64996f'); outline(X,Y,30,28,'#4f8a5c'); px(X+13,Y,4,9,'#f0e8f6');
     px(X+9,Y+18,2,6,'#b08a66'); px(X+19,Y+18,2,6,'#b08a66'); px(X+6,Y+9,18,11,'#b08a66'); px(X+7,Y+10,16,9,'#c9a27a'); px(X+8,Y+11,4,6,'#f6e7c8'); px(X+13,Y+11,4,4,'#f5c451'); px(X+18,Y+12,4,6,'#f6e7c8');
     if(S.tasks.length&&Math.floor(t/400)%2) px(X+22,Y+6,4,4,'#ef4a4a');
   }
 }
-function near(arr,v,d){ for(var i=0;i<arr.length;i++) if(Math.abs(arr[i]-v)<d) return true; return false; }
+function drawSmall(l,ox,oy){
+  var X=l.x-ox, Y=l.y-oy, ty=l.type, own=S.land[l.n];
+  if(own){
+    var bd=own.b?BUILDINGS.filter(function(b){return b.id===own.b;})[0]:null;
+    px(X,Y,15,14,'#5c8c66');
+    if(bd){ ctx.fillStyle='rgba(42,33,72,.35)'; ctx.fillRect(X+3,Y+3,11,9); px(X+2,Y+2,11,9,bd.c); px(X+2,Y+6,11,1,'#ffffff'); }
+    else { px(X+7,Y+4,1,7,'#b08a66'); px(X+8,Y+4,4,3,'#f5c451'); }
+    outline(X,Y,15,14,'#f5c451');
+  } else if(ty==='sale'){
+    px(X,Y,15,14,'#7d9a6a');
+    px(X,Y,4,1,'#f6e7c8'); px(X+11,Y,4,1,'#f6e7c8'); px(X,Y+13,4,1,'#f6e7c8'); px(X+11,Y+13,4,1,'#f6e7c8'); px(X,Y,1,4,'#f6e7c8'); px(X+14,Y,1,4,'#f6e7c8'); px(X,Y+10,1,4,'#f6e7c8'); px(X+14,Y+10,1,4,'#f6e7c8');
+    px(X+7,Y+8,1,3,'#b08a66'); px(X+5,Y+4,5,4,'#f6e7c8'); px(X+6,Y+5,3,1,'#c8647a');
+  } else if(ty==='house'){
+    px(X,Y,15,14,'#5f9068'); ctx.fillStyle='rgba(42,33,72,.35)'; ctx.fillRect(X+3,Y+3,11,9);
+    px(X+2,Y+2,11,9,l.roof); px(X+2,Y+6,11,1,l.ridge); px(X+10,Y+3,2,2,'#3a2433');
+  } else if(ty==='woods'){
+    px(X,Y,15,14,'#4a7a58'); tree(X+1,Y+1); tree(X+8,Y+6);
+  } else {
+    px(X,Y,15,14,'#5f9068'); px(X+2,Y+3,11,8,'#5aa0c8'); px(X+2,Y+3,1,1,'#5f9068'); px(X+12,Y+3,1,1,'#5f9068'); px(X+2,Y+10,1,1,'#5f9068'); px(X+12,Y+10,1,1,'#5f9068'); px(X+5,Y+5,4,1,'#bfe4f4');
+  }
+}
+/* 不會變的部分（草地、道路、沒人買的地）先畫到一張大圖上，之後每一格只要貼圖 */
+var townBg=null, miniBg=null;
+function thick(r,wd,col){
+  var x1=r[0],y1=r[1],x2=r[2],y2=r[3], h=wd/2;
+  if(x1===x2||y1===y2){ px(Math.min(x1,x2)-h,Math.min(y1,y2)-h,Math.abs(x2-x1)+wd,Math.abs(y2-y1)+wd,col); return; }
+  var len=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+  for(var i=0;i<=len;i++) px(x1+(x2-x1)*i/len-h,y1+(y2-y1)*i/len-h,wd,wd,col);
+}
+function renderTownBg(){
+  var saved=ctx, i, x, y;
+  townBg=document.createElement('canvas'); townBg.width=TW; townBg.height=TH; ctx=townBg.getContext('2d');
+  px(0,0,TW,TH,'#4d7a5a');
+  for(i=0;i<3200;i++) px(Math.floor(rnd(i+0.3)*TW),Math.floor(rnd(i*1.7+9)*TH),1,1,i%13===0?'#f6e7c8':(i%2?'#416b4f':'#5c8c66'));
+  for(i=0;i<420;i++){ x=Math.floor(rnd(i*2.3+5)*TW); y=Math.floor(rnd(i*3.1+11)*TH); if(nearestRoad(x+3,y+3).d>48) tree(x,y); }
+  for(y=-39;y<=39;y++){ var hw=Math.round(62*Math.sqrt(1-y*y/1521)); px(750-hw,425+y,hw*2,1,'#5aa0c8'); }
+  for(y=-33;y<=33;y+=11){ px(730+(y*7)%30,425+y,14,1,'#bfe4f4'); }
+  ROADS.forEach(function(r){ thick(r,18,'#b9a8cf'); }); ROADS.forEach(function(r){ thick(r,14,'#4a3f63'); });
+  ROADS.forEach(function(r){ var len=Math.sqrt((r[2]-r[0])*(r[2]-r[0])+(r[3]-r[1])*(r[3]-r[1])), ax=(r[0]===r[2]||r[1]===r[3]);
+    for(i=10;i<len-10;i+=12){ var qx=r[0]+(r[2]-r[0])*i/len, qy=r[1]+(r[3]-r[1])*i/len, clear=true;
+      for(var k=0;k<NODES.length;k++) if(Math.abs(NODES[k][0]-qx)<14&&Math.abs(NODES[k][1]-qy)<14){ clear=false; break; }
+      if(clear) px(qx,qy,ax&&r[1]===r[3]?6:(ax?1:2),ax&&r[0]===r[2]?6:(ax?1:2),'#8d7fb0'); } });
+  LOTS.forEach(function(l){ if(l.small) drawSmall(l,0,0); else if(l.type!=='farm'&&l.type!=='board') drawBig(l,0,0,0); });
+  ctx=saved;
+  miniBg=document.createElement('canvas'); miniBg.width=48; miniBg.height=35; var m=miniBg.getContext('2d');
+  m.fillStyle='#35284f'; m.fillRect(0,0,48,35); m.fillStyle='#5aa0c8'; m.fillRect(35,20,6,3);
+  m.strokeStyle='#8d7fb0'; m.lineWidth=1; ROADS.forEach(function(r){ m.beginPath(); m.moveTo(r[0]/20+0.5,r[1]/20+0.5); m.lineTo(r[2]/20+0.5,r[3]/20+0.5); m.stroke(); });
+  m.fillStyle='#f5c451'; FUNC.forEach(function(f){ m.fillRect(Math.round(f.x/20),Math.round(f.y/20),2,1); });
+  m.fillStyle='#ef7a8a'; m.fillRect(Math.round(FARMLOT.x/20),Math.round(FARMLOT.y/20),2,2);
+}
 function drawTown(t){
-  var cx=Math.round(town.cx), cy=Math.round(town.cy), i, x, y;
-  px(0,0,W,H,'#4d7a5a');
-  for(i=0;i<420;i++){ x=(i*53)%TW-cx; y=(i*89)%TH-cy; if(x>=0&&x<W&&y>=0&&y<H) px(x,y,1,1,i%13===0?'#f6e7c8':(i%2?'#416b4f':'#5c8c66')); }
-  HR.forEach(function(h){ px(0,h-9-cy,W,18,'#b9a8cf'); }); VR.forEach(function(v){ px(v-9-cx,0,18,H,'#b9a8cf'); });
-  HR.forEach(function(h){ px(0,h-7-cy,W,14,'#4a3f63'); }); VR.forEach(function(v){ px(v-7-cx,0,14,H,'#4a3f63'); });
-  HR.forEach(function(h){ for(i=-(cx%12);i<W;i+=12) if(!near(VR,i+cx+3,11)) px(i,h-cy,6,1,'#8d7fb0'); });
-  VR.forEach(function(v){ for(i=-(cy%12);i<H;i+=12) if(!near(HR,i+cy+3,11)) px(v-cx,i,1,6,'#8d7fb0'); });
-  LOTS.forEach(function(l){ drawLot(l,t); });
-  var catx=((t/140)%(TW+60))-30; bmp(ctx,BMP.cat,Math.round(catx)-cx,HR[2]+1-cy,false);
+  if(!townBg) renderTownBg();
+  var cx=Math.round(town.cx), cy=Math.round(town.cy);
+  ctx.drawImage(townBg,cx,cy,W,H,0,0,W,H);
+  LOTS.forEach(function(l){ if(l.x-cx>W||l.y-cy>H||l.x+l.w-cx<0||l.y+l.h-cy<0) return;
+    if(l.type==='farm'||l.type==='board') drawBig(l,t,cx,cy); else if(l.small&&S.land[l.n]) drawSmall(l,cx,cy); });
+  var catx=((t/140)%(TW+60))-30; bmp(ctx,BMP.cat,Math.round(catx)-cx,CY+1-cy,false);
   NPC.forEach(function(n,k){ person(Math.round(n.x)-3-cx,Math.round(n.y)-10-cy,Math.floor(t/260+k)%2,n.dir,n.c); });
   person(Math.round(town.x)-3-cx,Math.round(town.y)-10-cy,town.path.length?Math.floor(town.step)%2:0,town.dir,ME);
-  /* 右下角小地圖 */
   var mx=W-52, my=H-39;
-  ctx.fillStyle='rgba(42,33,72,.85)'; ctx.fillRect(mx-2,my-2,52,39); outline(mx-2,my-2,52,39,'#5e4a82');
-  LOTS.forEach(function(l){ var c=l.type==='farm'?'#ef7a8a':(l.type==='shop'||l.type==='board'?'#f5c451':(l.type==='home'?'#b48cf2':(l.type==='sale'?'#f6e7c8':(l.type==='house'?'#8d7fb0':'#4f9a62')))); px(mx+Math.round(l.x/10),my+Math.round(l.y/10),3,2,c); });
-  outline(mx+Math.round(cx/10),my+Math.round(cy/10),16,20,'#f6e7c8');
-  if(Math.floor(t/300)%2) px(mx+Math.round(town.x/10)-1,my+Math.round(town.y/10)-1,2,2,'#ffffff');
+  ctx.drawImage(miniBg,mx,my); outline(mx-1,my-1,50,37,'#5e4a82');
+  Object.keys(S.land).forEach(function(k){ var l=LOTMAP[k]; if(l) px(mx+Math.round(l.x/20),my+Math.round(l.y/20),1,1,'#8fd67a'); });
+  outline(mx+Math.round(cx/20),my+Math.round(cy/20),8,10,'#f6e7c8');
+  if(Math.floor(t/300)%2) px(mx+Math.round(town.x/20)-1,my+Math.round(town.y/20)-1,2,2,'#ffffff');
   updateLabels();
 }
 function townStep(dt){
   if(town.path.length){
     var T=town.path[0], dx=T[0]-town.x, dy=T[1]-town.y, d=Math.sqrt(dx*dx+dy*dy);
     if(d<1){ town.x=T[0]; town.y=T[1]; town.path.shift(); if(!town.path.length&&town.pending){ var l=town.pending; town.pending=null; enterLot(l); } }
-    else { var mv=Math.min(d,80*dt); town.x+=dx/d*mv; town.y+=dy/d*mv; if(Math.abs(dx)>0.5) town.dir=dx>0?1:-1; town.step+=dt*8; }
+    else { var mv=Math.min(d,95*dt); town.x+=dx/d*mv; town.y+=dy/d*mv; if(Math.abs(dx)>0.5) town.dir=dx>0?1:-1; town.step+=dt*8; }
   }
-  NPC.forEach(function(n){ n[n.ax]+=n.dir*n.sp*dt; var lim=n.ax==='x'?TW:TH; if(n[n.ax]<20) n.dir=1; if(n[n.ax]>lim-20) n.dir=-1; });
+  NPC.forEach(function(n){ n[n.ax]+=n.dir*n.sp*dt; if(n[n.ax]<n.lo) n.dir=1; if(n[n.ax]>n.hi) n.dir=-1; });
   town.cx=clamp(town.x-80,0,TW-W); town.cy=clamp(town.y-100,0,TH-H);
 }
-function best(arr,a,b){ var bv=arr[0], bd=1e9; arr.forEach(function(v){ var d=Math.abs(a-v)+Math.abs(v-b); if(d<bd){ bd=d; bv=v; } }); return bv; }
+/* 找路：起點和終點都在某條路上，用最短路徑沿著路網走 */
+function edgeAt(x,y){ var bi=-1, bd=2.5; EDGES.forEach(function(e,i){ var A=NODES[e.a], B=NODES[e.b], q=distPS(x,y,[A[0],A[1],B[0],B[1]]); if(q.d<bd){ bd=q.d; bi=i; } }); return bi; }
 function routeTo(T){
-  var px0=town.x, py0=town.y, onH=near(HR,py0,1), tH=near(HR,T[1],1), p=[];
-  if(onH&&tH){ if(Math.abs(py0-T[1])>1){ var vx=best(VR,px0,T[0]); p.push([vx,py0],[vx,T[1]]); } }
-  else if(onH){ p.push([T[0],py0]); }
-  else if(tH){ p.push([px0,T[1]]); }
-  else if(Math.abs(px0-T[0])>1){ var hy=best(HR,py0,T[1]); p.push([px0,hy],[T[0],hy]); }
-  p.push(T); town.path=p;
+  var es=edgeAt(town.x,town.y), et=edgeAt(T[0],T[1]);
+  if(es<0||et<0||es===et){ town.path=[T]; return; }
+  var N=NODES.length, SI=N, TI=N+1, adj=[], i, dist=[], prev=[], done=[];
+  for(i=0;i<N+2;i++){ adj.push([]); dist.push(1e9); prev.push(-1); done.push(false); }
+  EDGES.forEach(function(e){ adj[e.a].push([e.b,e.len]); adj[e.b].push([e.a,e.len]); });
+  function link(idx,x,y,e){ [e.a,e.b].forEach(function(k){ var d=Math.sqrt((NODES[k][0]-x)*(NODES[k][0]-x)+(NODES[k][1]-y)*(NODES[k][1]-y)); adj[idx].push([k,d]); adj[k].push([idx,d]); }); }
+  link(SI,town.x,town.y,EDGES[es]); link(TI,T[0],T[1],EDGES[et]);
+  dist[SI]=0;
+  for(;;){ var u=-1, bd=1e9; for(i=0;i<N+2;i++) if(!done[i]&&dist[i]<bd){ bd=dist[i]; u=i; }
+    if(u<0||u===TI) break; done[u]=true;
+    adj[u].forEach(function(a){ if(dist[u]+a[1]<dist[a[0]]){ dist[a[0]]=dist[u]+a[1]; prev[a[0]]=u; } }); }
+  var p=[T]; for(i=prev[TI];i>=0&&i!==SI;i=prev[i]) p.unshift(NODES[i]);
+  town.path=p;
 }
 function townClick(x,y){
   if(tab){ closePanel(); return; }
   var wx=x+town.cx, wy=y+town.cy, hit=null;
-  LOTS.forEach(function(l){ if(wx>=l.x&&wx<=l.x+30&&wy>=l.y&&wy<=l.y+28) hit=l; });
+  LOTS.forEach(function(l){ if(wx>=l.x&&wx<=l.x+l.w&&wy>=l.y&&wy<=l.y+l.h) hit=l; });
   if(hit){ town.pending=hit; routeTo(hit.door); return; }
-  town.pending=null;
-  var hy=best(HR,wy,wy), vx=best(VR,wx,wx);
-  routeTo(Math.abs(wy-hy)<=Math.abs(wx-vx)?[clamp(wx,7,TW-7),hy]:[vx,clamp(wy,7,TH-7)]);
+  town.pending=null; routeTo(nearestRoad(wx,wy).pt);
 }
 function enterLot(l){
   if(l.type==='farm') setScene('farm');
   else if(l.tab) showTab(l.tab);
-  else { curLot=l; showTab('lot'); }
+  else { curLot=l; fishReset(); showTab('lot'); }
 }
 function setScene(sc){
   scene=sc; if(tab) closePanel();
@@ -534,7 +621,7 @@ function openTab(t){
   refreshPanel();
 }
 function showTab(t){ tab=null; openTab(t); }
-function closePanel(){ if(tab) openTab(tab); }
+function closePanel(){ fishReset(); if(tab) openTab(tab); }
 function refreshPanel(){
   if(!tab) return;
   var now=Date.now(), h='', title='', sub='';
@@ -582,23 +669,46 @@ function refreshPanel(){
     var kn=RECIPES.filter(function(r){return S.known[r.out]||S.hint[r.out];});
     h+='<div class="sec">已發現的配方</div>'+(kn.length?kn.map(function(r){ return '<div class="row"><div class="sw" style="background:'+SMAP[r.out].color+'"></div><div class="info"><strong>'+SMAP[r.a].name+' × '+SMAP[r.b].name+' → '+SMAP[r.out].name+'</strong><small>'+(S.known[r.out]?'':'居民給的線索，還沒配成功過。')+'基礎成功率 '+Math.round(r.ch*100)+'%</small></div></div>'; }).join(''):'<div class="row"><div class="info"><small>還沒有。試試把兩種不同的作物放上去配種。</small></div></div>');
   } else if(tab==='lot'&&curLot){
-    var L=curLot, kind={sale:'待售土地',home:'居民',house:'民宅',woods:'綠地',pond:'綠地'}[L.type];
-    title=L.name; sub=kind+'・3×3 格';
-    if(L.type==='sale'){
-      h+='<div class="row"><div class="info"><strong>這塊地還沒有主人</strong><small>大小 3×3 格，門口面向大街。接上帳號後，你或朋友可以買下來蓋自己的農場。</small></div><button class="btn" disabled>'+L.price+' 金幣</button></div>';
-      h+='<div class="row locked"><div class="info"><small>目前只能看，還不能買。</small></div><span>即將開放</span></div>';
-    } else if(L.type==='home'){
-      var fv=S.favor[L.npc]||0;
+    var L=curLot, own=S.land[L.n], area=(L.sw||3)*(L.sh||3), cells='', ci, zone=L.c>0.75?'市中心':(L.c>0.5?'市區':(L.c>0.25?'近郊':'郊外'));
+    title=L.name;
+    if(L.small){
+      var bdg=own&&own.b?BUILDINGS.filter(function(b){return b.id===own.b;})[0]:null, cc=bdg?bdg.c:(L.type==='house'?L.roof:(L.type==='pond'?'#5aa0c8':(L.type==='woods'?'#2f6b45':'#7d9a6a')));
+      for(ci=0;ci<area;ci++) cells+='<i style="width:14px;height:14px;background:'+cc+';display:block"></i>';
+      h+='<div class="row"><div style="display:grid;grid-template-columns:repeat('+L.sw+',14px);gap:2px;padding:8px;background:#4d7a5a;border:2px solid '+(own?'#f5c451':'#c9a27a')+'">'+cells+'</div><div class="info"><strong>'+L.sw+'×'+L.sh+' 格，共 '+area+' 格</strong><small>地段：'+zone+'。在地圖上每塊地看起來一樣大，這裡是它實際的大小。</small></div></div>';
+    }
+    if(L.type==='home'){
+      sub='居民';
+      var fv=S.favor[L.npc]||0, stg=S.story[L.npc]||0, ST=STORIES[L.npc]||[];
       h+='<div class="row"><div class="info"><strong>'+L.npc+'在這裡</strong><small>'+L.desc+'</small></div></div>';
-      var stg=S.story[L.npc]||0, ST=STORIES[L.npc]||[];
       for(var si=0;si<stg;si++) h+='<div class="row"><div class="info"><strong>故事 '+(si+1)+'</strong><small>'+ST[si].t+'</small></div></div>';
       if(stg<ST.length){ var need=(stg+1)*3;
         h+='<div class="row"><div class="info"><strong>'+(fv>=need?'他好像有話想跟你說':'下一段故事')+'</strong><small>'+(fv>=need?'進去坐坐，聽他說。':'再幫他交貨 '+(need-fv)+' 次就會解鎖。')+'</small></div><button class="btn" data-act="story"'+(fv>=need?'':' disabled')+'>聽他說</button></div>'; }
       h+='<div class="row"><div class="info"><strong>好感：已幫忙交貨 '+fv+' 次</strong><small>每交貨 3 次會送你一份禮物，再 '+(3-fv%3)+' 次就有下一份。他的委託會出現在公告欄。</small></div></div>';
+    } else if(L.type==='sale'){
+      sub=own?'你的土地':'待售土地';
+      if(!own){
+        h+='<div class="row"><div class="info"><strong>這塊地還沒有主人</strong><small>越靠近市中心、面積越大越貴。買下後可以蓋溫室、民宿或花園。</small></div><button class="btn" data-act="buylot"'+(S.coins>=L.price?'':' disabled')+'>'+L.price+' 金幣</button></div>';
+      } else if(!own.b){
+        BUILDINGS.forEach(function(b){ var bc=b.per*area;
+          h+='<div class="row"><div class="sw" style="background:'+b.c+'"></div><div class="info"><strong>蓋'+b.name+'</strong><small>'+b.desc+'</small></div><button class="btn" data-act="build" data-id="'+b.id+'"'+(S.coins>=bc?'':' disabled')+'>'+bc+' 金幣</button></div>'; });
+        h+='<div class="row"><div class="info"><small>蓋了之後不能換，選好再蓋。</small></div></div>';
+      } else if(own.b==='garden'){
+        h+='<div class="row"><div class="info"><strong>花園</strong><small>這座花園讓農場魅力 +'+Math.floor(area/5)+'。目前總魅力 '+charmPts()+'，市場售價 +'+charmPts()+'%。</small></div></div>';
+      } else {
+        var yl=landYield(L,own,now), full=(now-own.t)>=28800000;
+        h+='<div class="row"><div class="info"><strong>'+bdg.name+(full?'（已經滿了）':'')+'</strong><small>'+(own.b==='inn'?'累積租金 '+yl+' 金幣':'長出 '+yl+' 株作物')+'，最多累積 8 小時，記得回來收。</small></div><button class="btn" data-act="collect2"'+(yl>0?'':' disabled')+'>收取</button></div>';
+      }
     } else if(L.type==='house'){
+      sub='民宅';
       h+='<div class="row"><div class="info"><strong>鎮上居民的家</strong><small>窗戶透著暖黃色的燈。主人不在，下次再來。</small></div></div>';
+    } else if(L.type==='pond'){
+      sub='可以釣魚';
+      h+='<div class="row"><div class="info"><strong>'+(fish.st==='wait'?'浮標在水面上晃…':(fish.st==='bite'?'上鉤了！快拉！':'水很清，看得到魚影'))+'</strong><small>'+(fish.msg||'拋竿後等魚上鉤，浮標一沉就馬上拉。太早或太慢魚都會跑掉。')+'</small></div>'+
+        (fish.st==='idle'?'<button class="btn" data-act="cast">拋竿</button>':'<button class="btn'+(fish.st==='bite'?' alt':' ghost')+'" data-act="pull">拉竿</button>')+'</div>';
+      h+='<div class="row"><div class="info"><small>小溪魚 50%、鯉魚 28%、金魚 15%、錦鯉 5.5%、龍魚 1.5%。釣到的魚在背包裡可以賣。</small></div></div>';
     } else {
-      h+='<div class="row"><div class="info"><strong>'+(L.type==='pond'?'水很清，偶爾有魚跳起來。':'風吹過樹葉沙沙響，很適合發呆。')+'</strong><small>公共綠地，不能買賣。</small></div></div>';
+      sub='綠地';
+      h+='<div class="row"><div class="info"><strong>風吹過樹葉沙沙響，很適合發呆。</strong><small>公共綠地，不能買賣。</small></div></div>';
     }
   } else if(tab==='decor'){
     title='雜貨店'; sub='農場魅力 '+charmPts()+'，售價 +'+charmPts()+'%';
@@ -816,6 +926,32 @@ $('plist').addEventListener('click',function(e){
   else if(act==='collect'){ if(S.job&&now>=S.job.until){ S.goods.push({t:S.job.t,v:S.job.v,q:S.job.q}); toast(GOODS[S.job.t].name+'做好了，到市場賣'); S.job=null; } }
   else if(act==='sellgoods'){ var gv=goodsValue(); if(gv){ S.goods=[]; addCoins(gv); toast('賣出加工品，進帳 '+gv+' 金幣'); } }
   else if(act==='music'){ toggleMusic(); }
+  else if(act==='buylot'){
+    var b1=curLot;
+    if(b1&&b1.type==='sale'&&!S.land[b1.n]&&S.coins>=b1.price){ S.coins-=b1.price; S.land[b1.n]={b:null,t:now}; toast('買下「'+b1.name+'」了，可以蓋東西'); }
+  }
+  else if(act==='build'){
+    var b2=curLot, o2=b2&&S.land[b2.n], d2=BUILDINGS.filter(function(x){return x.id===id;})[0];
+    if(o2&&!o2.b&&d2&&S.coins>=d2.per*b2.sw*b2.sh){ S.coins-=d2.per*b2.sw*b2.sh; o2.b=id; o2.t=now; toast(d2.name+'蓋好了'); }
+  }
+  else if(act==='collect2'){
+    var b3=curLot, o3=b3&&S.land[b3.n], y3=o3?landYield(b3,o3,now):0;
+    if(y3>0){
+      if(o3.b==='inn'){ addCoins(y3); toast('收到租金 '+y3+' 金幣'); }
+      else { var bp=STRAINS.filter(function(x){return !x.gen&&S.lvl>=x.lvl;}); for(var yi=0;yi<y3;yi++){ var ys=bp[Math.floor(Math.random()*bp.length)], yq=rollQ(0.45); S.inv[ys.id][yq]++; S.dex[ys.id+yq]=1; } toast('從溫室收了 '+y3+' 株作物'); }
+      o3.t=now;
+    }
+  }
+  else if(act==='cast'){
+    fishReset(); fish.st='wait';
+    fish.t1=setTimeout(function(){ fish.st='bite'; refreshPanel(); fish.t2=setTimeout(function(){ if(fish.st==='bite'){ fish.st='idle'; fish.msg='太慢了，魚跑掉了。'; refreshPanel(); } },1200); },1500+Math.random()*3500);
+  }
+  else if(act==='pull'){
+    if(fish.st==='bite'){
+      var fr=Math.random()*100, fi=0; while(fi<FISH.length-1&&fr>=FISH[fi].w){ fr-=FISH[fi].w; fi++; }
+      fishReset(); give(FISH[fi].id); fish.msg='釣到一條「'+IMAP[FISH[fi].id].name+'」（'+RAR[IMAP[FISH[fi].id].rar].n+'）。';
+    } else { fishReset(); fish.msg='太早了，魚被嚇跑了。'; }
+  }
   else if(act==='centry'){
     var ew=week(now), es=contestStrain(ew), eq=+id, ec=S.contest;
     if(ec&&ec.week<ew&&!ec.claimed){ toast('先看上週的名次，領完獎再參加'); }
