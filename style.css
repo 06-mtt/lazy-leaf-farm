@@ -265,3 +265,13 @@ select.inp{appearance:none;-webkit-appearance:none}
 .pk b{top:auto;bottom:16px}
 .chip.down{border-color:var(--bad);color:var(--bad)}
 #fbtns .btn.pull,#fbtns .btn.pull.ghost{flex:1}
+
+#farmbar{position:absolute;left:0;right:0;top:54px;display:none;flex-wrap:wrap;gap:6px;padding:0 8px;z-index:2;align-items:center}
+#farmbar.open{display:flex}
+#farmbar button{flex:none;padding:6px 10px;background:rgba(42,33,72,.92);border:2px solid var(--peach);color:var(--cream);font-size:12px;cursor:pointer}
+#farmbar button:active{background:var(--panel-2)}
+#farmbar button.on{background:var(--leaf);border-color:var(--leaf);color:var(--night);font-weight:700}
+#farmbar span{flex:1 0 100%;font-size:11px;color:var(--cream);background:rgba(42,33,72,.8);padding:3px 8px;order:2}
+.pk.on{border-color:var(--coin);background:var(--panel-2)}
+.pk.kd img{image-rendering:pixelated}
+#toast{pointer-events:none}

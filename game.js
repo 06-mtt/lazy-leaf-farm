@@ -50,12 +50,14 @@ function fresh(){
     stats:{harvest:0,earned:0,bluff:0,cat:0,ufo:0,gold:0},ach:{},items:{},pets:{}};
 }
 var S=Store.load();
-if(!S||S.v!==1||!S.plots||S.plots.length!==9) S=fresh();
+if(!S||S.v!==1||!S.plots||!validLen(S.plots.length)) S=fresh();
 function normalize(){
   S.items=S.items||{}; S.pets=S.pets||{}; S.sat=S.sat||{}; S.dex=S.dex||{}; S.tasks=S.tasks||[]; S.charm=S.charm||0;
   if(!S.nextTask) S.nextTask=Date.now()+300000;
   S.stats.tasks=S.stats.tasks||0; S.stats.best=S.stats.best||0; ['fish','breed','help'].forEach(function(k){ S.stats[k]=S.stats[k]||0; });
   S.land=S.land||{};
+  S.plots.forEach(function(p,i){ if(i>=9){ p.u=true; if(!p.k) p.k='g'; } if(p.k&&p.k!=='f'){ p.crop=null; p.prog=0; } });
+  S.farmPaid=Math.max(S.farmPaid||0,farmCount());
   S.rep=S.rep||0; S.contest=S.contest||null; S.story=S.story||{}; S.hint=S.hint||{};
   S.decor=S.decor||{}; S.look=S.look||{hat:'straw',shirt:'red'}; S.wardrobe=S.wardrobe||{straw:1,none:1,red:1}; S.dexInfo=S.dexInfo||{};
   S.seeds=S.seeds||{}; S.known=S.known||{}; S.goods=S.goods||[]; S.favor=S.favor||{}; S.job=S.job||null;
@@ -173,7 +175,19 @@ function sellStrain(id,now,commit){
   if(commit){ S.inv[id]=[0,0,0,0,0,0]; S.sat[id]={v:v,t:now}; }
   return Math.round(tot);
 }
-function neighbors(i){ var a=[]; if(i>=3)a.push(i-3); if(i<6)a.push(i+3); if(i%3)a.push(i-1); if(i%3!==2)a.push(i+1); return a; }
+function validLen(n){ return n===9||n===16||n===25||n===36; }
+function gridOf(n){ return n<=9?3:(n<=16?4:(n<=25?5:6)); }
+/* 格子編號固定：前 9 格是原本的 3×3，之後每擴一圈接在右邊和下面，舊格子的編號不會變 */
+function cellXY(i){ if(i<9) return [i%3,Math.floor(i/3)]; var g=Math.ceil(Math.sqrt(i+1)), j=i-(g-1)*(g-1); return j<g-1?[g-1,j]:[j-(g-1),g-1]; }
+function cellIndex(x,y){ var m=Math.max(x,y); if(m<3) return y*3+x; return x===m&&y<m?m*m+y:m*m+m+x; }
+function isFarm(p){ return !!p&&!!p.u&&(!p.k||p.k==='f'); }
+function farmCount(){ return S.plots.filter(isFarm).length; }
+function allOpen(){ for(var i=0;i<9;i++) if(!S.plots[i].u) return false; return true; }
+function cellHas(id){ return S.plots.some(function(q){ return q.k==='d'&&q.d===id; }); }
+/* 田越多，每株收成越少：9 塊以內 5 到 10 個，之後平均是 22.5 ÷ 田地數的平方根 */
+function yieldRange(F){ if(F<=9) return [5,10]; var a=22.5/Math.sqrt(F); return [Math.max(1,Math.floor(a*2/3)),Math.ceil(a*4/3)]; }
+function rollYield(){ var F=farmCount(); if(F<=9) return 5+Math.floor(Math.random()*6); var x=22.5/Math.sqrt(F)*(2/3+2/3*Math.random()), n=Math.floor(x); return Math.max(1,n+(Math.random()<x-n?1:0)); }
+function neighbors(i){ var c=cellXY(i), g=gridOf(S.plots.length), a=[]; [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(d){ var x=c[0]+d[0], y=c[1]+d[1]; if(x>=0&&y>=0&&x<g&&y<g) a.push(cellIndex(x,y)); }); return a; }
 function isRipe(p){ return p.crop&&p.prog>=SMAP[p.crop].time; }
 function addCoins(n){ S.coins+=n; if(n>0) S.stats.earned+=n; }
 function addXp(n){
@@ -218,6 +232,7 @@ function hud(){
   badge('b_ach',S.tasks.length,'!'); badge('b_pets',back,''); badge('b_upg',ib.mail+ib.coop+fanN+frRipe(),'');
   $('golbl').textContent=scene==='farm'?'去小鎮':(scene==='visit'?'回小鎮':'回農場');
   var gi=scene==='farm'?'town':'farm'; if($('goicon').dataset.ti!==gi){ $('goicon').dataset.ti=gi; $('goicon').src=TICON[gi]; }
+  farmBar();
 }
 
 /* ---------- 像素繪圖 ---------- */
@@ -278,7 +293,8 @@ var ICON={}, TICON={};
   Array.prototype.forEach.call(document.querySelectorAll('img[data-ti]'),function(el){ el.src=TICON[el.dataset.ti]; });
   $('i_coin').src=TICON.coin; $('i_rep').src=TICON.rep;
 })();
-STRAINS.forEach(function(s){ ICON[s.id]=icon(artBmp(ART.crop[s.id],s.color)); ICON['seed_'+s.id]=icon(artBmp(ART.seed[s.id],s.color)); });
+var CROPB={};
+STRAINS.forEach(function(s){ CROPB[s.id]=artBmp(ART.crop[s.id],s.color); ICON[s.id]=icon(CROPB[s.id]); ICON['seed_'+s.id]=icon(artBmp(ART.seed[s.id],s.color)); });
 FISH.forEach(function(f){ BMP[f.id]=artBmp(ART.fish[f.id],f.c); });
 Object.keys(ART.item).forEach(function(k){ BMP[k]={rows:ART.item[k].rows,pal:ART.item[k].pal}; });
 var PROPBMP={}; Object.keys(ART.prop).forEach(function(k){ PROPBMP[k]={rows:ART.prop[k].rows,pal:ART.prop[k].pal}; ICON['prop_'+k]=icon(PROPBMP[k]); });
@@ -289,7 +305,75 @@ PETS.forEach(function(p){ ICON['pet_'+p.id]=icon(BMP[p.id]); var sp={}; Object.k
 BMP.juice={rows:['.......ww...','......w.....','..gggggggg..','..gjjjjjjg..','..gjjjjjjg..','..gjjwjjjg..','..gjjjjjjg..','...gjjjjg...','...gggggg...'],pal:{w:'#f6e7c8',g:'#cfe8e8',j:'#f5a742'}};
 BMP.jam={rows:['...rrrrrr...','...rrrrrr...','..wwwwwwww..','..wjjjjjjw..','..wjjwjjjw..','..wjjjjjjw..','..wjjjjwjw..','..wjjjjjjw..','...wwwwww...'],pal:{r:'#f6e7c8',w:'#cfe8e8',j:'#c8647a'}};
 ICON.juice=icon(BMP.juice); ICON.jam=icon(BMP.jam);
-function plotRect(i){ return {x:7+(i%3)*51,y:62+Math.floor(i/3)*45,w:44,h:40}; }
+var GEO={3:[44,40,51,45,7],4:[35,31,37,33,7],5:[28,25,29,26,8],6:[23,21,24,22,8]};
+function plotRect(i,n){ var g=GEO[gridOf(n||farmState().plots.length)], c=cellXY(i); return {x:g[4]+c[0]*g[2],y:62+c[1]*g[3],w:g[0],h:g[1]}; }
+function bmpS(b,x,y,sc,flip){ for(var r=0;r<b.rows.length;r++) for(var k=0,L=b.rows[r].length;k<L;k++){ var ch=b.rows[r][k]; if(ch!=='.'){ ctx.fillStyle=b.pal[ch]; ctx.fillRect(x+(flip?L-1-k:k)*sc,y+r*sc,sc,sc); } } }
+function sameK(FS,GS,x,y,k){ if(x<0||y<0||x>=GS||y>=GS) return false; var q=FS.plots[cellIndex(x,y)]; return !!q&&q.u&&q.k===k; }
+var KCOL={p:'#63a070',s:'#8f8aa6',w:'#4f8a5a',o:'#3f7fb8'};
+/* 田地以外的格子：草地、寵物區、石板路、花圃、小水池、擺裝飾。相鄰同類的格子會連在一起 */
+function drawCell(p,i,r,t,FS,GS){
+  var k=p.k, c=cellXY(i), g=GEO[GS], gx=g[2]-g[0], gy=g[3]-g[1], n, col=KCOL[k];
+  if(col){
+    var Rn=sameK(FS,GS,c[0]+1,c[1],k), Bn=sameK(FS,GS,c[0],c[1]+1,k), Ln=sameK(FS,GS,c[0]-1,c[1],k), Tn=sameK(FS,GS,c[0],c[1]-1,k);
+    px(r.x,r.y,r.w+(Rn?gx:0),r.h,col); if(Bn) px(r.x,r.y+r.h,r.w,gy,col); if(Rn&&Bn&&sameK(FS,GS,c[0]+1,c[1]+1,k)) px(r.x+r.w,r.y+r.h,gx,gy,col);
+    if(k==='p'){ for(n=2;n<r.h;n+=4) px(r.x,r.y+n,r.w+(Rn?gx:0),2,'#5a9668'); px(r.x+2+Math.floor(rnd(i*3.1+1)*(r.w-6)),r.y+3+Math.floor(rnd(i*5.3+2)*(r.h-7)),2,1,'#8fd67a'); }
+    else if(k==='s'){
+      for(n=0;n*6<r.h;n++){ px(r.x,r.y+n*6,r.w+(Rn?gx:0),1,'#77728f'); for(var sx=(n%2?4:0);sx<r.w;sx+=9) px(r.x+sx,r.y+n*6,1,Math.min(6,r.h-n*6),'#77728f'); }
+      px(r.x+2+Math.floor(rnd(i*2.3+4)*(r.w-5)),r.y+2+Math.floor(rnd(i*4.1+3)*(r.h-4)),2,1,'#a9a4c0');
+    }
+    else if(k==='w'){
+      var FC=['#ef7a8a','#f5c451','#f4f1ea','#b48cf2','#ee9a72'], cnt=Math.max(4,Math.floor(r.w*r.h/70));
+      for(n=0;n<cnt;n++){ var fx=r.x+2+Math.floor(rnd(i*7.7+n*3.3)*(r.w-5)), fy=r.y+3+Math.floor(rnd(i*2.9+n*5.1)*(r.h-6)), sw=Math.floor(t/600+n+i)%4===0?1:0;
+        px(fx+1,fy+2,1,2,'#2f6b45'); px(fx+sw,fy,2,2,FC[(n+i)%5]); px(fx+sw,fy,1,1,'#fff6c8'); }
+    }
+    else if(k==='o'){
+      var bg='#4d7a5a';
+      if(!Tn) px(r.x,r.y,r.w,1,'#2f5f8f'); if(!Bn) px(r.x,r.y+r.h-1,r.w,1,'#2f5f8f'); if(!Ln) px(r.x,r.y,1,r.h,'#2f5f8f'); if(!Rn) px(r.x+r.w-1,r.y,1,r.h,'#2f5f8f');
+      if(!Tn&&!Ln) px(r.x,r.y,2,2,bg); if(!Tn&&!Rn) px(r.x+r.w-2,r.y,2,2,bg); if(!Bn&&!Ln) px(r.x,r.y+r.h-2,2,2,bg); if(!Bn&&!Rn) px(r.x+r.w-2,r.y+r.h-2,2,2,bg);
+      px(r.x+3+Math.floor((t/260+i*7)%(r.w-9)),r.y+4+Math.floor(rnd(i*1.7)*(r.h-9)),4,1,'#7fb8e0'); px(r.x+3+Math.floor((t/340+i*13)%(r.w-8)),r.y+r.h-6,3,1,'#5f9fd0');
+      if(rnd(i*9.1+5)<0.6){ var lx=r.x+4+Math.floor(rnd(i*6.3)*(r.w-10)), ly=r.y+5+Math.floor(rnd(i*8.9)*(r.h-11)); px(lx,ly,3,2,'#6fbf5f'); px(lx+1,ly,1,1,'#3f7fb8'); }
+    }
+  } else if(k==='d'){
+    var b=PROPBMP[p.d], cx=r.x+(r.w>>1);
+    px(cx-8,r.y+r.h-3,16,2,'#416b4f');
+    if(b) bmpS(b,cx-b.rows[0].length,r.y+r.h-3-b.rows.length*2+((p.d==='cactus'||p.d==='disco')&&Math.floor(t/400)%2?1:0),2,p.d==='flamingo'&&Math.floor(t/3000)%2===0);
+    else { px(cx-4,r.y+r.h-7,8,4,'#b08a66'); px(cx-5,r.y+r.h-8,10,1,'#c9a27a'); }
+  }
+}
+function drawSmallPlot(p,i,r,t,now){
+  var wet=p.crop&&now<p.water, cx=r.x+(r.w>>1);
+  px(r.x,r.y,r.w,r.h,'#3b2a2a'); px(r.x+1,r.y+1,r.w-2,r.h-2,wet?'#5a3d33':'#7a5644');
+  for(var fy=r.y+5;fy<r.y+r.h-4;fy+=6) px(r.x+3,fy,r.w-6,1,wet?'#4a3029':'#69483a');
+  if(!p.crop){ if(scene!=='visit'&&!plan){ if(pickI===i) outline(r.x-1,r.y-1,r.w+2,r.h+2,'#f5c451'); else if(Math.floor(t/700)%2){ px(cx,r.y+(r.h>>1)-2,1,5,'#8a6a58'); px(cx-2,r.y+(r.h>>1),5,1,'#8a6a58'); } } return; }
+  var s=SMAP[p.crop]; if(!s) return; var frac=Math.min(1,p.prog/s.time), ripe=frac>=1;
+  if(ripe) bmp(ctx,CROPB[s.id],cx-8,r.y+Math.max(0,r.h-19-(Math.floor(t/300+i)%2)));
+  else { var ms=r.h>=31?3:2; drawPlant(cx,r.y+r.h-5,Math.min(ms,Math.floor(frac*(ms+1))),s,t,i); }
+  px(r.x+2,r.y+r.h-3,r.w-4,2,'#2a1f1f'); px(r.x+2,r.y+r.h-3,Math.round((r.w-4)*frac),2,s.color);
+  if(ripe){ if(Math.floor(t/250)%2) px(r.x+r.w-4,r.y+1,3,3,'#f5c451'); }
+  else if(!wet&&Math.floor(t/400)%2){ px(r.x+r.w-3,r.y+1,1,1,'#7fd8f0'); px(r.x+r.w-4,r.y+2,3,2,'#7fd8f0'); }
+}
+/* 寵物區：有畫寵物區時，在家的寵物只在這些格子上走動 */
+var ZP={key:null,m:{}}, zLast=0;
+function drawZonePets(t,FS){
+  var NP=FS.plots.length, GS=gridOf(NP), cells=[]; FS.plots.forEach(function(q,k){ if(q.u&&q.k==='p') cells.push(k); });
+  if(!cells.length) return;
+  if(ZP.key!==FS.plots||ZP.n!==NP) ZP={key:FS.plots,n:NP,m:{}};
+  var dt=Math.max(0,Math.min(200,t-zLast)), pi=0, list=[]; zLast=t;
+  PETS.forEach(function(pt){
+    if(!FS.pets[pt.id]||FS.pets[pt.id].trip) return;
+    var b=BMP[pt.id], wd=b.rows[0].length, ht=b.rows.length, o=ZP.m[pt.id];
+    function spot(c){ var r=plotRect(c,NP); return [r.x+1+Math.random()*Math.max(1,r.w-wd-2),r.y+Math.min(r.h,ht+1)+Math.random()*Math.max(1,r.h-ht-1)]; }
+    if(!o||!FS.plots[o.c]||FS.plots[o.c].k!=='p'){ var c0=cells[(pi*7+3)%cells.length], s0=spot(c0); o=ZP.m[pt.id]={c:c0,x:s0[0],y:s0[1],tx:s0[0],ty:s0[1],rest:t+400+Math.random()*1500,right:pi%2===0}; }
+    var dx=o.tx-o.x, dy=o.ty-o.y, d=Math.sqrt(dx*dx+dy*dy), moving=d>0.6;
+    if(moving){ var st=Math.min(d,dt/pt.pace); o.x+=dx/d*st; o.y+=dy/d*st; if(Math.abs(dx)>0.3) o.right=dx>0; }
+    else if(!o.rest) o.rest=t+700+Math.random()*2600;
+    else if(t>o.rest){ var cc=cellXY(o.c), opts=[o.c]; [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(v){ if(sameK(FS,GS,cc[0]+v[0],cc[1]+v[1],'p')){ var ni=cellIndex(cc[0]+v[0],cc[1]+v[1]); opts.push(ni); opts.push(ni); } });
+      o.c=opts[Math.floor(Math.random()*opts.length)]; var s1=spot(o.c); o.tx=s1[0]; o.ty=s1[1]; o.rest=0; }
+    list.push([pt,o,moving,pi]); pi++;
+  });
+  list.sort(function(a,b){ return a[1].y-b[1].y; });
+  list.forEach(function(e){ var pt=e[0], o=e[1], b=BMP[pt.id]; bmp(ctx,e[2]&&Math.floor(t/220+e[3])%2?BMPW[pt.id]:b,Math.round(o.x),Math.round(o.y)-b.rows.length-((pt.hop&&e[2]&&Math.floor(t/250+e[3])%2)?1:0),o.right!==pt.faceRight); });
+}
 var STARS=[[12,5],[40,11],[66,4],[92,14],[130,7],[150,16],[24,20],[108,24]];
 var sparks=[];
 function burst(x,y,c){ for(var i=0;i<8;i++) sparks.push({x:x,y:y,vx:(Math.random()-.5)*1.6,vy:-Math.random()*1.8-.4,life:18,c:c}); }
@@ -335,21 +419,24 @@ function draw(t){
   px(6,28,30,22,'#7a4a52'); var rc=FS.decor.goldroof?'#f5c451':'#b8566a'; px(4,24,34,5,rc); px(8,20,26,4,rc); px(12,17,18,3,rc);
   px(17,37,8,13,'#3a2433'); px(27,33,6,6,Math.floor(t/1500)%7?'#ffd98a':'#f5c451');
   person(42,36+(Math.floor(t/600)%2),0,1,FS.me);
-  drawDecor(t,FS.decor,FS.hide,FS.show);
+  drawDecor(t,FS.decor,FS.hide,FS.show,FS.plots);
+  var hasZone=FS.plots.some(function(q){ return q.u&&q.k==='p'; });
   // 圍籬上的貓
   var cx0=((t/110)%520)-20; if(cx0<170) bmp(ctx,BMP.cat,Math.round(cx0),41+(Math.floor(t/300)%2));
   // 自己養的寵物在田邊散步
   var pi=0;
   PETS.forEach(function(pt){
-    if(!FS.pets[pt.id]||FS.pets[pt.id].trip) return;
+    if(hasZone||!FS.pets[pt.id]||FS.pets[pt.id].trip) return;
     var b=BMP[pt.id], wd=b.rows[0].length, span=W-wd-8, ph=(t/pt.pace+pi*97)%(span*2), right=ph<span, xx=right?ph:span*2-ph;
     bmp(ctx,Math.floor(t/220+pi)%2?BMPW[pt.id]:b,4+Math.round(xx),61-b.rows.length-((pt.hop&&Math.floor(t/250+pi)%2)?1:0),right!==pt.faceRight);
     pi++;
   });
   // 田地
-  var firstLocked=-1; for(i=0;i<9;i++) if(!FS.plots[i].u){ firstLocked=i; break; }
-  for(i=0;i<9;i++){
-    var p=FS.plots[i], r=plotRect(i);
+  var NP=FS.plots.length, GS=gridOf(NP), firstLocked=-1; for(i=0;i<9;i++) if(!FS.plots[i].u){ firstLocked=i; break; }
+  for(i=0;i<NP;i++){
+    var p=FS.plots[i], r=plotRect(i,NP);
+    if(p.u&&p.k&&p.k!=='f'){ drawCell(p,i,r,t,FS,GS); continue; }
+    if(r.w<44){ drawSmallPlot(p,i,r,t,now); continue; }
     if(!p.u){
       px(r.x,r.y,r.w,r.h,'#3c5c48'); px(r.x+2,r.y+2,r.w-4,r.h-4,'#456a52');
       px(r.x+18,r.y+12,8,7,'#2a2148'); px(r.x+19,r.y+8,6,5,'#2a2148'); px(r.x+21,r.y+10,2,3,'#456a52');
@@ -362,7 +449,7 @@ function draw(t){
     var wet=p.crop&&now<p.water;
     px(r.x,r.y,r.w,r.h,'#3b2a2a'); px(r.x+2,r.y+2,r.w-4,r.h-4,wet?'#5a3d33':'#7a5644');
     for(var fyy=r.y+7;fyy<r.y+r.h-6;fyy+=8) px(r.x+4,fyy,r.w-8,1,wet?'#4a3029':'#69483a');
-    if(!p.crop&&scene!=='visit'){
+    if(!p.crop&&scene!=='visit'&&!plan){
       if(pickI===i) outline(r.x-1,r.y-1,r.w+2,r.h+2,'#f5c451');
       else if(Math.floor(t/700)%2){ px(r.x+21,r.y+16,3,7,'#8a6a58'); px(r.x+19,r.y+18,7,3,'#8a6a58'); }
     }
@@ -374,6 +461,8 @@ function draw(t){
       else if(!wet&&Math.floor(t/400)%2){ px(r.x+37,r.y+3,1,1,'#7fd8f0'); px(r.x+36,r.y+4,3,1,'#7fd8f0'); px(r.x+35,r.y+5,5,3,'#7fd8f0'); px(r.x+36,r.y+8,3,1,'#7fd8f0'); px(r.x+36,r.y+6,1,1,'#eafaff'); }
     }
   }
+  if(plan&&scene==='farm') for(i=0;i<NP;i++){ var pr=plotRect(i,NP); outline(pr.x-1,pr.y-1,pr.w+2,pr.h+2,i===pickI?'#f5c451':'rgba(246,231,200,.4)'); }
+  if(hasZone) drawZonePets(t,FS);
   var wv=SET.fx?weather(now).id:'none';
   if(wv==='rain'){ for(i=0;i<46;i++){ var rx=(i*41+Math.floor(t/30)*3)%W, ry=(i*67+Math.floor(t/30)*9)%H; px(rx,ry,1,3,'#9fd0f0'); } }
   else if(wv==='heat'){ ctx.fillStyle='rgba(255,170,90,.13)'; ctx.fillRect(0,0,W,H); for(i=0;i<5;i++) px(118+Math.round(Math.cos(i*1.3+t/900)*15),40+Math.round(Math.sin(i*1.3+t/900)*-9),2,2,'#ffd9a0'); }
@@ -563,11 +652,11 @@ function lookOf(look,g){
   return {hatType:h.id,hat:h.c,hair:'#6b4a3a',skin:'#f2c9a0',shirt:sh.c,pat:sh.pat,c2:sh.c2,acc:ac.id,accC:ac.c,pants:'#3d4a7a',long:g==='f'};
 }
 var DSLOT=[[51,'sign'],[65,'lamp'],[81,'birdhouse'],[96,'scarecrow'],[112,'lantern'],[126,'trophy'],[140,'windmill']];
-function propRoom(){ var free=DSLOT.filter(function(sl){ return !(S.decor[sl[1]]&&!S.decorHide[sl[1]]); }).length; return free-DECOR.filter(function(x){ return x.prop&&S.decor[x.id]&&S.decorShow[x.id]; }).length; }
-function drawDecor(t,D0,hide,show){
-  hide=hide||{}; var D={}, k, r; Object.keys(D0||{}).forEach(function(id){ if(D0[id]&&!hide[id]) D[id]=1; });
+function propRoom(){ var free=DSLOT.filter(function(sl){ return !(S.decor[sl[1]]&&!S.decorHide[sl[1]]); }).length; return free-DECOR.filter(function(x){ return x.prop&&S.decor[x.id]&&S.decorShow[x.id]&&!cellHas(x.id); }).length; }
+function drawDecor(t,D0,hide,show,plots){
+  hide=hide||{}; var D={}, k, r, oc={}; (plots||[]).forEach(function(q){ if(q.k==='d'&&q.d) oc[q.d]=1; }); Object.keys(D0||{}).forEach(function(id){ if(D0[id]&&!hide[id]) D[id]=1; });
   var free=DSLOT.filter(function(sl){ return !D[sl[1]]; }), fi=0;
-  DECOR.forEach(function(x){ if(!x.prop||!D[x.id]||(show&&!show[x.id])||fi>=free.length) return; var b=PROPBMP[x.id], sx=free[fi++][0], wob=(x.id==='cactus'||x.id==='disco')&&Math.floor(t/400)%2?1:0;
+  DECOR.forEach(function(x){ if(!x.prop||!D[x.id]||oc[x.id]||(show&&!show[x.id])||fi>=free.length) return; var b=PROPBMP[x.id], sx=free[fi++][0], wob=(x.id==='cactus'||x.id==='disco')&&Math.floor(t/400)%2?1:0;
     bmp(ctx,b,sx+1+wob,50-b.rows.length,x.id==='flamingo'&&Math.floor(t/3000)%2===0); });
   if(D.sign){ px(56,44,1,6,'#b08a66'); px(51,38,11,7,'#b08a66'); px(52,39,9,5,'#c9a27a'); px(53,40,6,1,'#5e4a82'); px(53,42,4,1,'#5e4a82'); }
   if(D.lamp){ ctx.fillStyle='rgba(255,217,138,.18)'; ctx.fillRect(66,28,9,9); px(70,34,1,16,'#2a2148'); px(69,31,3,3,'#ffd98a'); px(68,30,5,1,'#2a2148'); }
@@ -662,7 +751,7 @@ function drawBig(l,t,ox,oy){
     px(X+13,Y+24,4,4,'#b08a66'); px(X+3,Y+4,9,8,S.decor.goldroof?'#f5c451':'#b8566a'); px(X+3,Y+7,9,1,'#d97a8a');
     for(k=0;k<9;k++){
       var p=S.plots[k], qx=X+13+(k%3)*5, qy=Y+4+Math.floor(k/3)*6;
-      if(!p.u){ px(qx,qy,4,5,'#456a52'); continue; }
+      if(!isFarm(p)){ px(qx,qy,4,5,'#456a52'); continue; }
       px(qx,qy,4,5,'#7a5644');
       if(p.crop){ var st=SMAP[p.crop]; px(qx+1,qy+1,2,3,p.prog>=st.time?st.color:'#6fbf5f'); }
     }
@@ -679,7 +768,7 @@ function drawFarmSmall(l,ox,oy,mine,col,landOnly){
   if(landOnly){ px(X+3,Y+3,9,7,'#9a8fb8'); px(X+3,Y+3,9,1,'#c9bfd8'); px(X+6,Y+10,3,3,'#b08a66'); }
   else for(k=0;k<9;k++){
     var qx=X+1+(k%3)*5, qy=Y+1+Math.floor(k/3)*4;
-    if(mine){ var p=S.plots[k]; if(!p.u){ px(qx,qy,4,3,'#456a52'); continue; } px(qx,qy,4,3,'#7a5644'); if(p.crop){ var st=SMAP[p.crop]; px(qx+1,qy+1,2,1,p.prog>=st.time?st.color:'#6fbf5f'); } }
+    if(mine){ var p=S.plots[k]; if(!isFarm(p)){ px(qx,qy,4,3,'#456a52'); continue; } px(qx,qy,4,3,'#7a5644'); if(p.crop){ var st=SMAP[p.crop]; px(qx+1,qy+1,2,1,p.prog>=st.time?st.color:'#6fbf5f'); } }
     else { px(qx,qy,4,3,'#7a5644'); if((k+l.n)%3) px(qx+1,qy+1,2,1,'#6fbf5f'); }
   }
   outline(X,Y,15,14,col);
@@ -789,7 +878,7 @@ function enterLot(l){
   else { curLot=l; fishReset(); showTab('lot'); }
 }
 function setScene(sc,keep){
-  scene=sc; if(tab) closePanel(); if(sc!=='visit') VISIT=null;
+  scene=sc; plan=false; if(tab) closePanel(); if(sc!=='visit') VISIT=null;
   closePicker(); town.drag=null;
   if(sc==='town'&&keep){ loadWorld(); townStep(0); }
   else if(sc==='town'){ loadWorld(); var hl=homeLot(); centerOn(hl.x+7,hl.y+7); if(!S.townSeen) toast('拖曳可以移動地圖，點一塊地直接進入或查看'); S.townSeen=1; }
@@ -807,7 +896,7 @@ function openPicker(i){
   el.innerHTML=have.length?'<div class="pkgrid">'+have.map(function(s){
       return '<button type="button" class="pk" data-seed="'+s.id+'"><img alt="" src="'+ICON['seed_'+s.id]+'"><b>'+S.seeds[s.id]+'</b><span>'+s.name+'</span>'+(priceMult(s,Date.now())>=1.2?'<u>行情好</u>':'')+(p.prev?(p.prev===s.id?'<i class="down">連種</i>':'<i class="up">輪作</i>'):'')+'</button>'; }).join('')+'</div>'
     :'<div class="pkempty">沒有種子</div><button type="button" class="btn" data-shop="1">去商店買</button>';
-  if(have.length&&S.plots.filter(function(x){ return x.u&&!x.crop; }).length>1) el.innerHTML+='<button type="button" class="pkall'+(S.plantAll?' on':'')+'" data-all="1"><i></i>所有空地都種這個</button>';
+  if(have.length&&S.plots.filter(function(x){ return isFarm(x)&&!x.crop; }).length>1) el.innerHTML+='<button type="button" class="pkall'+(S.plantAll?' on':'')+'" data-all="1"><i></i>所有空地都種這個</button>';
   el.classList.add('open');
   var pw=el.offsetWidth, ph=el.offsetHeight, cx=cv.offsetLeft+(r.x+r.w/2)*sc, top=cv.offsetTop+r.y*sc, bot=cv.offsetTop+(r.y+r.h)*sc;
   var left=clamp(cx-pw/2,6,st.clientWidth-pw-6), y=top-ph-8; if(y<6) y=Math.min(bot+8,st.clientHeight-ph-6);
@@ -815,71 +904,160 @@ function openPicker(i){
 }
 function plant(i,id,quiet){
   var p=S.plots[i], s=SMAP[id], r=plotRect(i), now=Date.now();
-  if(!p||!p.u||p.crop||!s||!(S.seeds[id]>0)) return false;
+  if(!isFarm(p)||p.crop||!s||!(S.seeds[id]>0)) return false;
   S.seeds[id]--; S.seed=id;
-  p.crop=s.id; p.prog=0; p.last=now; p.dry=0; p.t0=now; p.stolen=0; p.n=5+Math.floor(Math.random()*6); p.water=S.upg.sprinkler?now+1e9:0;
+  p.crop=s.id; p.prog=0; p.last=now; p.dry=0; p.t0=now; p.stolen=0; p.n=rollYield(); p.water=S.upg.sprinkler?now+1e9:0;
   if(p.prev===s.id){ p.streak=(p.streak||0)+1; p.rot=Math.max(-0.3,-0.08*p.streak*(has(s,'heirloom')?2:1)); }
   else { p.streak=0; p.rot=p.prev?0.1:0; }
   p.prev=s.id;
-  burst(r.x+22,r.y+30,'#7a5644'); if(quiet) return true; sfx('plant');
+  burst(r.x+r.w/2,r.y+r.h*0.75,'#7a5644'); if(quiet) return true; sfx('plant');
   toast('種下「'+s.name+'」'+(p.rot>0?'，輪作：品質運氣提高':(p.rot<0?'，連種：品質運氣下降':''))+(S.upg.sprinkler?'':'，再點一下澆水'));
   checkAch(); hud(); refreshPanel(); Store.save(S); return true;
 }
 $('picker').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b) return; var i=pickI;
+  if(b.dataset.kind){ planSet(i,b.dataset.kind); return; }
+  if(b.dataset.prop){ var pc=S.plots[i]; if(pc&&!pc.crop){ pc.k='d'; pc.d=b.dataset.prop; sfx('plant'); } closePicker(); hud(); Store.save(S); return; }
+  if(b.dataset.shopdecor){ closePicker(); plan=false; shopTab='decor'; showTab('shop'); return; }
   if(b.dataset.shop){ closePicker(); shopTab='seed'; showTab('shop'); return; }
   if(b.dataset.all){ S.plantAll=S.plantAll?0:1; openPicker(i); return; }
   closePicker(); var sid=b.dataset.seed, cnt=0;
-  if(S.plantAll){ if(plant(i,sid,true)) cnt++; S.plots.forEach(function(x,k){ if(x.u&&!x.crop&&S.seeds[sid]>0&&plant(k,sid,true)) cnt++; });
+  if(S.plantAll){ if(plant(i,sid,true)) cnt++; S.plots.forEach(function(x,k){ if(isFarm(x)&&!x.crop&&S.seeds[sid]>0&&plant(k,sid,true)) cnt++; });
     if(cnt){ sfx('plant'); toast('種下「'+SMAP[sid].name+'」×'+cnt+(S.upg.sprinkler?'':'，記得澆水')); checkAch(); hud(); refreshPanel(); Store.save(S); } }
   else plant(i,sid);
 });
 function logAdd(m,t){ S.log=S.log||[]; S.log.push({t:t||Date.now(),m:m}); S.log.sort(function(a,b){ return b.t-a.t; }); if(S.log.length>80) S.log.length=80; }
 
 /* ---------- 田地操作：點一下，依狀態做對的事 ---------- */
+function qTxt(cnt){ return cnt.map(function(c,q){ return c?RAR[q].n+' '+c:''; }).filter(Boolean).reverse().join('、'); }
+function harvestAt(i){
+  var p=S.plots[i], st=SMAP[p.crop], r=plotRect(i), now=Date.now();
+  var pn=p.n||5, hn=Math.max(0,pn-(p.stolen||0)), L=luck(p,st), cnt=[0,0,0,0,0,0], best=-1, hk, kept=false, hbs='';
+  for(hk=0;hk<hn;hk++){ var q=rollQ(L); cnt[q]++; S.inv[st.id][q]++; S.dex[st.id+q]=1; if(q>best) best=q; }
+  if(hn){
+    S.stats.harvest+=hn; if(st.id==='gold') S.stats.gold+=hn; if(best>S.stats.best) S.stats.best=best;
+    var di=S.dexInfo[st.id]||(S.dexInfo[st.id]={n:0,first:now}); di.n+=hn;
+    kept=st.gen?Math.random()<0.6+0.05*best:Math.random()<petBonus('bunny'); if(kept) S.seeds[st.id]=(S.seeds[st.id]||0)+1;
+    /* 經驗跟著收成個數走：平均 7.5 個時和以前一樣 */
+    addXp(Math.ceil(st.time/100*(pn/7.5)*(1+petBonus('chick'))*(1+0.2*best)*evMul('xp')));
+    var hbe=activeEvents(now).filter(function(e){return e.hongbao;})[0]; if(hbe&&S.hbDay!==twDate(now)){ S.hbDay=twDate(now); addCoins(hbe.hongbao); hbs='，春節紅包 +'+hbe.hongbao; }
+  }
+  if(S.charm>0) S.charm--;
+  p.crop=null; p.prog=0; p.n=0; p.stolen=0;
+  if(has(st,'spark')) neighbors(i).forEach(function(k){ var o=S.plots[k]; if(o.crop&&!isRipe(o)){ o.prog+=SMAP[o.crop].time*0.15; var rr=plotRect(k); burst(rr.x+rr.w/2,rr.y+rr.h/2,'#f2e35c'); } });
+  if(hn) burst(r.x+r.w/2,r.y+r.h*0.3,RAR[best].c); else logAdd('「'+st.name+'」被偷光，沒有收成');
+  return {st:st,hn:hn,cnt:cnt,best:best,kept:kept,hbs:hbs};
+}
+function waterAt(i){ var p=S.plots[i], st=SMAP[p.crop], r=plotRect(i), now=Date.now(); p.water=now+waterSpan(st)*(weather(now).id==='heat'?0.6:1); burst(r.x+r.w/2,r.y+r.h*0.6,'#7fd8f0'); }
+function harvestAll(){
+  var now=Date.now(), n=0, tot=0, cnt=[0,0,0,0,0,0], best=-1, kept=0, gone=0, hbs='';
+  S.plots.forEach(function(p,i){ if(!isFarm(p)||!p.crop||!SMAP[p.crop]) return; grow(p,now); if(!isRipe(p)) return;
+    var h=harvestAt(i); n++; tot+=h.hn; if(!h.hn) gone++; h.cnt.forEach(function(c,q){ cnt[q]+=c; }); if(h.best>best) best=h.best; if(h.kept) kept++; if(h.hbs) hbs=h.hbs; });
+  if(!n) return;
+  if(tot){ sfx('harvest',best); toast('收成 '+n+' 塊田，共 '+tot+' 個：'+qTxt(cnt)+(kept?'，留下 '+kept+' 顆種子':'')+(gone?'，有 '+gone+' 塊被偷光':'')+hbs); }
+  else { sfx('err'); toast('全被偷光了，什麼都沒剩'); }
+  checkAch(); hud(); refreshPanel(); Store.save(S);
+}
+function waterAll(){
+  var now=Date.now(), n=0;
+  S.plots.forEach(function(p,i){ if(!isFarm(p)||!p.crop||!SMAP[p.crop]) return; grow(p,now); if(isRipe(p)||now<p.water) return; waterAt(i); n++; });
+  if(!n) return; sfx('water'); toast('澆了 '+n+' 塊田'); hud(); Store.save(S);
+}
+/* ---------- 規劃模式：9 格全開後，可以擴建農場、決定每一格的用途 ---------- */
+var plan=false, KICON={};
+(function(){
+  function mk(fn){ var c=document.createElement('canvas'); c.width=16; c.height=16; var x=c.getContext('2d'); fn(function(a,b,w,h,col){ x.fillStyle=col; x.fillRect(a,b,w,h); }); return c.toDataURL(); }
+  KICON.f=mk(function(q){ q(1,2,14,12,'#3b2a2a'); q(2,3,12,10,'#7a5644'); q(3,6,10,1,'#69483a'); q(3,10,10,1,'#69483a'); q(8,4,1,4,'#3f8f4a'); q(6,5,2,1,'#6fbf5f'); q(9,6,2,1,'#6fbf5f'); });
+  KICON.g=mk(function(q){ q(1,2,14,12,'#4d7a5a'); q(3,4,1,1,'#5c8c66'); q(9,6,1,1,'#f6e7c8'); q(5,10,1,1,'#416b4f'); q(12,11,1,1,'#5c8c66'); q(11,4,1,1,'#416b4f'); });
+  KICON.p=mk(function(q){ q(1,2,14,12,'#63a070'); for(var n=4;n<14;n+=4) q(1,n,14,2,'#5a9668'); q(6,8,4,3,'#f6e7c8'); q(5,6,1,2,'#f6e7c8'); q(7,5,1,2,'#f6e7c8'); q(9,5,1,2,'#f6e7c8'); q(10,6,1,2,'#f6e7c8'); });
+  KICON.s=mk(function(q){ q(1,2,14,12,'#8f8aa6'); q(1,2,14,1,'#77728f'); q(1,8,14,1,'#77728f'); q(6,2,1,6,'#77728f'); q(10,8,1,6,'#77728f'); q(3,8,1,6,'#77728f'); q(3,4,2,1,'#a9a4c0'); });
+  KICON.w=mk(function(q){ q(1,2,14,12,'#4f8a5a'); [[3,4,'#ef7a8a'],[9,3,'#f5c451'],[6,8,'#f4f1ea'],[11,9,'#b48cf2'],[3,10,'#ee9a72']].forEach(function(f){ q(f[0],f[1],2,2,f[2]); q(f[0]+1,f[1]+2,1,2,'#2f6b45'); }); });
+  KICON.o=mk(function(q){ q(1,2,14,12,'#2f5f8f'); q(2,3,12,10,'#3f7fb8'); q(4,5,4,1,'#7fb8e0'); q(8,10,3,1,'#5f9fd0'); q(10,6,3,2,'#6fbf5f'); });
+  KICON.d=mk(function(q){ q(1,2,14,12,'#4d7a5a'); q(4,12,8,1,'#416b4f'); q(6,3,4,3,'#ef4a4a'); q(7,2,2,1,'#ef4a4a'); q(6,6,4,2,'#f2c9a0'); q(6,8,4,2,'#f4f1ea'); q(5,10,6,2,'#5aa0f2'); });
+})();
+function farmBar(){
+  var el=$('farmbar'); if(!el) return; var h='', now=Date.now();
+  if(scene==='farm'&&!(gate&&gateOn())){
+    if(plan){ var g=gridOf(S.plots.length), F=farmCount(), yr=yieldRange(F);
+      h=(g<6?'<button type="button" data-fb="expand">擴建成 '+(g+1)+'×'+(g+1)+'</button>':'')+'<button type="button" class="on" data-fb="done">完成</button><span>規劃中：點格子改用途。田地 '+F+' 塊，每株收成 '+yr[0]+' 到 '+yr[1]+' 個</span>'; }
+    else { var ripe=0, dry=0; S.plots.forEach(function(p){ if(!isFarm(p)||!p.crop||!SMAP[p.crop]) return; if(isRipe(p)) ripe++; else if(now>=p.water) dry++; });
+      if(ripe>1) h+='<button type="button" data-fb="harvest">全部收成 '+ripe+'</button>'; if(dry>1) h+='<button type="button" data-fb="water">全部澆水 '+dry+'</button>'; if(allOpen()) h+='<button type="button" data-fb="plan">規劃</button>'; }
+  }
+  if(el._h!==h){ el.innerHTML=h; el._h=h; } el.classList.toggle('open',!!h);
+}
+$('farmbar').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b||modalOpen) return; var k=b.dataset.fb; sfx('tap'); closePicker();
+  if(k==='harvest') harvestAll(); else if(k==='water') waterAll();
+  else if(k==='plan'){ if(tab) closePanel(); plan=true; if(!S.planSeen){ S.planSeen=1; toast('點任何一格，選它的用途'); } }
+  else if(k==='done') plan=false;
+  else if(k==='expand') expandFarm();
+  hud();
+});
+function expandFarm(){
+  var g=gridOf(S.plots.length); if(g>=6) return; var c=EXPAND_COST[g+1], add=2*g+1;
+  if(S.coins<c){ sfx('err'); toast('擴建成 '+(g+1)+'×'+(g+1)+' 要 '+nf(c)+' 金幣'); return; }
+  modal('star','擴建農場',['把農場擴成 '+(g+1)+'×'+(g+1)+'，多出 '+add+' 格。','新的格子先是草地，可以改成田地、寵物區，或擺上裝飾。','費用 '+nf(c)+' 金幣。'],[['擴建',function(){
+    if(S.coins<c||gridOf(S.plots.length)!==g) return; S.coins-=c; for(var k=0;k<add;k++) S.plots.push({u:true,k:'g',crop:null,prog:0,last:0,water:0});
+    logAdd('農場擴建成 '+(g+1)+'×'+(g+1)+'（'+nf(c)+' 金幣）'); sfx('coin'); toast('農場變成 '+(g+1)+'×'+(g+1)+' 了'); }],['先不要']]);
+}
+function openPlanPicker(i,props){
+  var p=S.plots[i], r=plotRect(i), el=$('picker'), sc=cv.clientWidth/W, st=$('stage'), h;
+  if(p.crop){ closePicker(); toast('這格還有作物，收成之後才能改用途'); return; }
+  pickI=i; sfx('open');
+  if(props){
+    var used={}; S.plots.forEach(function(q,k){ if(k!==i&&q.k==='d'&&q.d) used[q.d]=1; });
+    var ps=DECOR.filter(function(x){ return x.prop&&S.decor[x.id]&&!used[x.id]; });
+    h=ps.length?'<div class="pkgrid">'+ps.map(function(x){ return '<button type="button" class="pk kd'+(p.k==='d'&&p.d===x.id?' on':'')+'" data-prop="'+x.id+'"><img alt="" src="'+ICON['prop_'+x.id]+'"><span>'+x.name+'</span></button>'; }).join('')+'</div>'
+      :'<div class="pkempty">沒有還沒擺出來的小擺飾</div><button type="button" class="btn" data-shopdecor="1">去商店的裝飾頁買</button>';
+  } else {
+    var cur=p.k||'f', fc=(isFarm(p)||farmCount()<S.farmPaid)?0:farmCost(S.farmPaid+1);
+    h='<div class="pkgrid">'+CELLS.map(function(c){ return '<button type="button" class="pk kd'+(cur===c.id?' on':'')+'" data-kind="'+c.id+'"><img alt="" src="'+KICON[c.id]+'"><span>'+c.name+'</span>'+(c.id==='f'&&fc?'<u>'+nf(fc)+'</u>':'')+'</button>'; }).join('')+'</div>';
+  }
+  el.innerHTML=h; el.classList.add('open');
+  var pw=el.offsetWidth, ph=el.offsetHeight, cx=cv.offsetLeft+(r.x+r.w/2)*sc, top=cv.offsetTop+r.y*sc, bot=cv.offsetTop+(r.y+r.h)*sc;
+  var left=clamp(cx-pw/2,6,st.clientWidth-pw-6), y=top-ph-8; if(y<6) y=Math.min(bot+8,st.clientHeight-ph-6);
+  el.style.left=left+'px'; el.style.top=y+'px';
+}
+function planSet(i,k){
+  var p=S.plots[i]; if(!p||p.crop){ closePicker(); return; }
+  if(k==='d'){ openPlanPicker(i,true); return; }
+  function apply(){ p.k=k; delete p.d; if(k!=='f'){ p.prev=null; p.streak=0; p.rot=0; }
+    else { var hi=yieldRange(farmCount())[1]; S.plots.forEach(function(q){ if(q.crop&&q.n>hi) q.n=Math.max(hi,(q.stolen||0)+1); }); }
+    sfx('plant'); }
+  if(k==='f'&&!isFarm(p)&&farmCount()>=S.farmPaid){
+    var no=S.farmPaid+1, c=farmCost(no), yr=yieldRange(farmCount()+1); closePicker();
+    if(S.coins<c){ sfx('err'); toast('開墾第 '+no+' 塊田要 '+nf(c)+' 金幣'); return; }
+    modal('star','開墾第 '+no+' 塊田',['費用 '+nf(c)+' 金幣，付過之後這個名額就是你的，改成別的用途再改回來不用重付。','田地變成 '+(farmCount()+1)+' 塊後，每株收成 '+yr[0]+' 到 '+yr[1]+' 個。'],[['開墾',function(){
+      if(S.coins<c||p.crop||isFarm(p)) return; S.coins-=c; S.farmPaid=no; logAdd('開墾第 '+no+' 塊田（'+nf(c)+' 金幣）'); apply(); sfx('coin'); }],['先不要']]);
+    return;
+  }
+  apply(); closePicker(); hud(); Store.save(S);
+}
 cv.addEventListener('click',function(e){
   if(modalOpen) return;
   var b=cv.getBoundingClientRect(), x=(e.clientX-b.left)/b.width*W, y=(e.clientY-b.top)/b.height*H, now=Date.now();
   if(scene==='town'){ if(town.moved){ town.moved=false; return; } townClick(x,y); return; }
   if(scene==='visit'){ visitClick(x,y); return; }
-  var hitI=-1, hi; for(hi=0;hi<9;hi++){ var hr=plotRect(hi); if(x>=hr.x&&x<=hr.x+hr.w&&y>=hr.y&&y<=hr.y+hr.h) hitI=hi; }
-  if(pickI>=0&&(hitI<0||S.plots[hitI].crop||!S.plots[hitI].u)){ closePicker(); return; }
-  for(var i=0;i<9;i++){
-    var r=plotRect(i); if(x<r.x||x>r.x+r.w||y<r.y||y>r.y+r.h) continue;
-    var p=S.plots[i];
-    if(!p.u){
-      var first=-1; for(var k=0;k<9;k++) if(!S.plots[k].u){ first=k; break; }
-      toast('到小鎮的「地政所」買地'+(i===first?'，這塊要 '+PLOT_COST[i]+' 金幣':'')); return;
-    } else if(!p.crop){
-      if(pickI===i) closePicker(); else openPicker(i);
-      return;
-    } else {
-      grow(p,now);
-      var st=SMAP[p.crop];
-      if(isRipe(p)){
-        var hn=Math.max(0,(p.n||5)-(p.stolen||0)), L=luck(p,st), cnt=[0,0,0,0,0,0], best=-1, hk, kept=false, hbs='';
-        for(hk=0;hk<hn;hk++){ var q=rollQ(L); cnt[q]++; S.inv[st.id][q]++; S.dex[st.id+q]=1; if(q>best) best=q; }
-        if(hn){
-          S.stats.harvest+=hn; if(st.id==='gold') S.stats.gold+=hn; if(best>S.stats.best) S.stats.best=best;
-          var di=S.dexInfo[st.id]||(S.dexInfo[st.id]={n:0,first:now}); di.n+=hn;
-          kept=st.gen?Math.random()<0.6+0.05*best:Math.random()<petBonus('bunny'); if(kept) S.seeds[st.id]=(S.seeds[st.id]||0)+1;
-          addXp(Math.ceil(st.time/100*(1+petBonus('chick'))*(1+0.2*best)*evMul('xp')));
-          var hbe=activeEvents(now).filter(function(e){return e.hongbao;})[0]; if(hbe&&S.hbDay!==twDate(now)){ S.hbDay=twDate(now); addCoins(hbe.hongbao); hbs='，春節紅包 +'+hbe.hongbao; }
-        }
-        if(S.charm>0) S.charm--;
-        p.crop=null; p.prog=0; p.n=0; p.stolen=0;
-        if(has(st,'spark')) neighbors(i).forEach(function(k){ var o=S.plots[k]; if(o.crop&&!isRipe(o)){ o.prog+=SMAP[o.crop].time*0.15; var rr=plotRect(k); burst(rr.x+22,rr.y+20,'#f2e35c'); } });
-        if(hn){ burst(r.x+22,r.y+12,RAR[best].c); sfx('harvest',best);
-          toast('收成「'+st.name+'」×'+hn+'：'+cnt.map(function(c,q){ return c?RAR[q].n+' '+c:''; }).filter(Boolean).reverse().join('、')+(kept?'，留下一顆種子':'')+hbs); }
-        else { sfx('err'); toast('「'+st.name+'」被偷光了，什麼都沒剩'); logAdd('「'+st.name+'」被偷光，沒有收成'); }
-      } else if(now>=p.water){
-        p.water=now+waterSpan(st)*(weather(now).id==='heat'?0.6:1); burst(r.x+22,r.y+24,'#7fd8f0'); sfx('water');
-      } else {
-        toast('「'+st.name+'」還要 '+fmt((st.time-p.prog)/speed()));
-      }
-    }
-    checkAch(); hud(); refreshPanel(); Store.save(S); return;
+  var NP=S.plots.length, hitI=-1, hi; for(hi=0;hi<NP;hi++){ var hr=plotRect(hi,NP); if(x>=hr.x&&x<=hr.x+hr.w&&y>=hr.y&&y<=hr.y+hr.h) hitI=hi; }
+  if(plan){ if(hitI<0||hitI===pickI) closePicker(); else openPlanPicker(hitI); return; }
+  if(pickI>=0&&(hitI<0||S.plots[hitI].crop||!isFarm(S.plots[hitI]))){ closePicker(); return; }
+  if(hitI<0) return;
+  var i=hitI, r=plotRect(i,NP), p=S.plots[i];
+  if(!p.u){
+    var first=-1; for(var k=0;k<9;k++) if(!S.plots[k].u){ first=k; break; }
+    toast('到小鎮的「地政所」買地'+(i===first?'，這塊要 '+PLOT_COST[i]+' 金幣':'')); return;
   }
+  if(!isFarm(p)) return;
+  if(!p.crop){ if(pickI===i) closePicker(); else openPicker(i); return; }
+  grow(p,now);
+  var st=SMAP[p.crop];
+  if(isRipe(p)){
+    var h=harvestAt(i);
+    if(h.hn){ sfx('harvest',h.best); toast('收成「'+st.name+'」×'+h.hn+'：'+qTxt(h.cnt)+(h.kept?'，留下一顆種子':'')+h.hbs); }
+    else { sfx('err'); toast('「'+st.name+'」被偷光了，什麼都沒剩'); }
+  } else if(now>=p.water){ waterAt(i); sfx('water'); }
+  else toast('「'+st.name+'」還要 '+fmt((st.time-p.prog)/speed()));
+  checkAch(); hud(); refreshPanel(); Store.save(S);
 });
 
 /* ---------- 面板 ---------- */
@@ -887,7 +1065,7 @@ var tab=null;
 var TABGRP={log:'upg',acct:'upg',friends:'upg',settings:'upg',mail:'upg',rank:'upg',admin:'upg',gift:'upg',coopPick:'upg'};
 function openTab(t){
   if(fish.view&&t!==tab) fishReset();
-  var prev=tab; tab=(tab===t)?null:t; petZoom=false; closePicker();
+  var prev=tab; tab=(tab===t)?null:t; petZoom=false; closePicker(); if(tab) plan=false;
   $('panel').classList.toggle('open',!!tab);
   var g=TABGRP[tab]||tab;
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button[data-tab]'),function(b){ b.classList.toggle('on',b.dataset.tab===g); });
@@ -910,7 +1088,7 @@ function authErr(m){
   if(/fetch|network|load failed/i.test(m)) return location.hostname==='06-mtt.github.io'?'連不到伺服器，請檢查網路後再試一次':'這個版本連不到伺服器，請用 06-mtt.github.io/lazy-leaf-farm 開啟遊戲';
   return '發生錯誤：'+m;
 }
-function validSave(d){ return !!(d&&d.v===1&&d.plots&&d.plots.length===9); }
+function validSave(d){ return !!(d&&d.v===1&&d.plots&&validLen(d.plots.length)); }
 function newPlayer(home){ var n=fresh(); n.home=home; return n; }
 function ensureHome(){ if(!S.home||!LOTMAP[S.home]) S.home=HOMEPOOL[Math.floor(Math.random()*HOMEPOOL.length)].n; }
 
@@ -1126,9 +1304,10 @@ function visitClick(x,y){
   if(tab){ closePanel(); return; }
   if(y<60){ showTab('visit'); return; }
   var V=VISIT; if(!V) return;
-  for(var i=0;i<9;i++){
+  for(var i=0;i<V.fs.plots.length;i++){
     var r=plotRect(i); if(x<r.x||x>r.x+r.w||y<r.y||y>r.y+r.h) continue;
     var p=V.fs.plots[i], now=Date.now();
+    if(p.u&&p.k&&p.k!=='f') return;
     if(!p.u||!p.crop){ toast('這塊田是空的'); return; }
     var st=SMAP[p.crop]; if(!st) return;
     if(p.prog>=st.time){
@@ -1147,8 +1326,8 @@ function farmAct(i,kind){
   serverOp('farm_action',{p_owner:owner,p_plot:i,p_kind:kind}).then(function(res){
     if(!VISIT||VISIT.owner!==owner) return; var p=VISIT.fs.plots[i];
     if(!res||!res.ok){ if(res&&res.blocked){ p.mine=true; sfx('err'); logAdd('去「'+V.name+'」的農場偷菜，被柴犬趕走'); modal('dog','被發現了！',[res.msg],[['快跑']]); } else { sfx('err'); toast((res&&res.msg)||'沒有成功'); } return; }
-    if(kind==='water'){ p.water=Date.now()+Math.max(45,SMAP[p.crop].time*0.5)*1000; burst(r.x+22,r.y+24,'#7fd8f0'); sfx('water'); S.stats.help=(S.stats.help||0)+1; toast(res.msg); }
-    else { p.mine=true; p.stolen=(p.stolen||0)+(res.n||1); burst(r.x+22,r.y+12,'#f5c451'); sfx('harvest',1); toast('偷到「'+SMAP[res.strain].name+'」×'+(res.n||1)+'，快溜'); logAdd('到「'+V.name+'」的農場偷了「'+SMAP[res.strain].name+'」×'+(res.n||1)); Store.save(S); }
+    if(kind==='water'){ p.water=Date.now()+Math.max(45,SMAP[p.crop].time*0.5)*1000; burst(r.x+r.w/2,r.y+r.h*0.6,'#7fd8f0'); sfx('water'); S.stats.help=(S.stats.help||0)+1; toast(res.msg); }
+    else { p.mine=true; p.stolen=(p.stolen||0)+(res.n||1); burst(r.x+r.w/2,r.y+r.h*0.3,'#f5c451'); sfx('harvest',1); toast('偷到「'+SMAP[res.strain].name+'」×'+(res.n||1)+'，快溜'); logAdd('到「'+V.name+'」的農場偷了「'+SMAP[res.strain].name+'」×'+(res.n||1)); Store.save(S); }
   },function(){ sfx('err'); toast('連線有問題，請再試一次'); });
 }
 function loadMsgs(){
@@ -1354,7 +1533,7 @@ function refreshPanel(){
           if(!!x.prop!==!!g[1]) return; var own=S.decor[x.id]; if(x.rep&&!own) return; if(x.ev&&!evOn(x.ev)&&!own) return;
           var shown=x.prop?!!S.decorShow[x.id]:!S.decorHide[x.id];
           h+='<div class="row">'+(x.prop?'<img class="picon" alt="" style="--rar:var(--line);width:24px;height:24px" src="'+ICON['prop_'+x.id]+'">':'')+'<div class="info"><strong>'+x.name+(x.ev?'<span class="chip gold">活動</span>':'')+(own?'<span class="chip up">已擁有</span>':'')+'</strong><small>魅力 +'+x.charm+'</small></div>'+
-            (own?'<button class="btn'+(shown?' ghost':' alt')+'" data-act="decortog" data-id="'+x.id+'">'+(shown?'收起來':'擺出來')+'</button>':'<button class="btn" data-act="buydecor" data-id="'+x.id+'"'+(S.coins<x.cost?' disabled':'')+'>'+coinTxt(x.cost)+'</button>')+'</div>';
+            (own&&x.prop&&cellHas(x.id)?'<button class="btn ghost" disabled>擺在格子上</button>':own?'<button class="btn'+(shown?' ghost':' alt')+'" data-act="decortog" data-id="'+x.id+'">'+(shown?'收起來':'擺出來')+'</button>':'<button class="btn" data-act="buydecor" data-id="'+x.id+'"'+(S.coins<x.cost?' disabled':'')+'>'+coinTxt(x.cost)+'</button>')+'</div>';
         }); }); }
   } else if(tab==='log'){
     title='農場紀錄'; sub='最近 '+S.log.length+' 筆'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
@@ -1488,10 +1667,10 @@ function refreshPanel(){
     });
     h+='<div class="row"><div class="info"><small>聲望來自品評會、完成限時任務、聽居民的故事。</small></div></div>';
   } else if(tab==='land'){
-    var own=S.plots.filter(function(p){return p.u;}).length;
+    var own=S.plots.slice(0,9).filter(function(p){return p.u;}).length;
     title='地政所'; sub='持有 '+own+' / 9 塊地';
     if(own<9) h+='<div class="row"><div class="info"><strong>農場第 '+(own+1)+' 塊地</strong><small>買下後回農場就能種</small></div><button class="btn" data-act="buyland"'+(S.coins>=PLOT_COST[own]?'':' disabled')+'>'+coinTxt(PLOT_COST[own])+'</button></div>';
-    else h+='<div class="row"><div class="info"><strong>農場的地都買齊了</strong></div></div>';
+    else { var lg=gridOf(S.plots.length); h+='<div class="row"><div class="info"><strong>農場現在是 '+lg+'×'+lg+'</strong><small>'+(lg<6?'回農場按「規劃」可以擴建成 '+(lg+1)+'×'+(lg+1)+'（'+nf(EXPAND_COST[lg+1])+' 金幣），也能決定每一格的用途':'已經擴到最大。回農場按「規劃」可以改每一格的用途')+'</small></div></div>'; }
     h+='<div class="row"><div class="info"><strong>小鎮上的土地</strong><small>點有木牌的空地可以買。你有 '+Object.keys(S.land).length+' 塊地</small></div></div>';
   } else if(tab==='pets'){
     title='寵物'; sub='養了 '+Object.keys(S.pets).length+' / '+PETS.length+' 隻';
@@ -1674,7 +1853,7 @@ function refreshPanel(){
       '<div class="row"><div class="info"><small>音效音量</small><input class="rng" id="set_svol" type="range" min="0" max="100" value="'+Math.round(SET.svol*100)+'"></div></div>'+
       '<div class="sec">畫面</div>'+tg('fx','天氣特效','下雨、起霧、熱浪、彩虹的畫面效果')+tg('labels','小鎮地名','在小鎮地圖上顯示建築和朋友農場的名字')+'<div class="sec">通知</div><div class="row"><div class="info"><strong>推播通知</strong><small>作物成熟、有人偷菜、收到禮物時通知你。iPhone 要先把遊戲「加入主畫面」，從主畫面打開才能開。</small>'+(PUSHMSG?'<small class="down">'+esc(PUSHMSG)+'</small>':'')+'</div><button class="btn'+(PUSH_ON?'':' ghost')+'" data-act="push">'+(PUSH_ON?'開':'關')+'</button></div>'+
       '<div class="sec">進度</div><div class="row"><div class="info"><strong>重新開始</strong><small>'+'帳號進度會清空（雲端也會覆蓋），買的小鎮土地會釋出，農場位置不變。'+'</small></div><button class="btn ghost" data-act="reset">'+(resetArm?'再按一次確定':'重新開始')+'</button></div>'+
-      '<div class="row"><div class="info"><small>懶草農場 v1.3</small></div></div>';
+      '<div class="row"><div class="info"><small>懶草農場 v1.4</small></div></div>';
   } else if(tab==='ach'){
     var done=ACH.filter(function(a){return S.ach[a.id];}).length;
     title='任務與成就'; sub='成就 '+done+' / '+ACH.length;
@@ -1976,7 +2155,7 @@ $('plist').addEventListener('click',function(e){
   }
   else if(act==='buyland'){
     var li=-1; S.plots.forEach(function(p,k){ if(li<0&&!p.u) li=k; });
-    if(li>=0&&S.coins>=PLOT_COST[li]){ S.coins-=PLOT_COST[li]; S.plots[li].u=true; toast('新的一塊地到手，回農場看看'); }
+    if(li>=0&&S.coins>=PLOT_COST[li]){ S.coins-=PLOT_COST[li]; S.plots[li].u=true; S.farmPaid=Math.max(S.farmPaid||0,farmCount()); toast('新的一塊地到手，回農場看看'); }
   }
   else if(act==='reset'){
     if(!resetArm){ resetArm=true; }

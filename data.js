@@ -58,6 +58,10 @@ var SEASON_OF={lazy:0,clover:0,mint:0,lime:0,lemon:1,grape:1,typhoon:1,purple:2,
 var TRIPS=[{n:'30 分',ms:1800000,rolls:1},{n:'2 小時',ms:7200000,rolls:3},{n:'8 小時',ms:28800000,rolls:8}];
 var GOODS={juice:{name:'綜合果汁',desc:'兩種作物榨的，價格固定，不受行情和飽和影響。'},jam:{name:'手工果醬',desc:'三株同品種熬的，價格固定，不受行情和飽和影響。'}};
 var PLOT_COST=[0,0,0,300,1000,4000,15000,50000,150000];
+/* 農場擴建：9 格全開後可以擴成 4×4、5×5、6×6；第 10 塊田起開墾費繼續往上 */
+var EXPAND_COST={4:1500000,5:6000000,6:20000000};
+function farmCost(k){ return k<=9?0:Math.round(300000*Math.pow(1.08,k-10)/10000)*10000; }
+var CELLS=[{id:'f',name:'田地'},{id:'g',name:'草地'},{id:'p',name:'寵物區'},{id:'s',name:'石板路'},{id:'w',name:'花圃'},{id:'o',name:'小水池'},{id:'d',name:'擺裝飾'}];
 /* 配種的等級門檻：配出第幾代的品種需要幾級 */
 var BREED_LV={1:6,2:15,3:24,4:32};
 var UPG={
