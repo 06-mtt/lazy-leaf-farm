@@ -18,6 +18,19 @@ var STRAINS=[
   {id:'typhoon',name:'熱帶颱風', cost:0,time:240, base:220, color:'#4fc3f7',lvl:0,gen:2,trait:'thirsty spark',       tname:'暴風',  tdesc:'愛喝水，收成時帶動相鄰作物'},
   {id:'galaxy', name:'銀河鑽石', cost:0,time:2400,base:1300,color:'#c9d6ff',lvl:0,gen:2,trait:'night heirloom lucky',tname:'星塵',  tdesc:'夜行，品質運氣極高，連種退步快'},
   {id:'phoenix',name:'鳳凰之淚', cost:0,time:3600,base:2800,color:'#ef4a4a',lvl:0,gen:3,trait:'lucky heirloom spark',tname:'不死鳥',tdesc:'品質運氣極高，收成時帶動相鄰作物'},
+  /* 第二批配種品種 */
+  {id:'cotton', name:'雲朵棉花糖',cost:0,time:150, base:95,  color:'#f0e6ff',lvl:0,gen:1,trait:'hardy night',         tname:'軟綿',  tdesc:'不怕乾、夜行'},
+  {id:'bubble', name:'深海泡泡', cost:0,time:360, base:190, color:'#4a8fe0',lvl:0,gen:1,trait:'thirsty night',       tname:'深海',  tdesc:'愛喝水、夜行'},
+  {id:'honey',  name:'太陽蜂蜜', cost:0,time:900, base:420, color:'#ffc93c',lvl:0,gen:1,trait:'spark heirloom',      tname:'蜂蜜',  tdesc:'帶動相鄰作物，品質運氣高，連種退步快'},
+  {id:'lavender',name:'薰衣草奶茶',cost:0,time:600,base:300, color:'#c3a6f5',lvl:0,gen:1,trait:'thirsty lucky',       tname:'香氣',  tdesc:'愛喝水，品質運氣高'},
+  {id:'cocoa',  name:'午夜可可', cost:0,time:480, base:250, color:'#8a5a44',lvl:0,gen:1,trait:'night lucky',         tname:'可可',  tdesc:'夜行，品質運氣高'},
+  {id:'dream',  name:'夢遊綿羊', cost:0,time:360, base:330, color:'#fff6d8',lvl:0,gen:2,trait:'hardy night lucky',   tname:'好夢',  tdesc:'不怕乾、夜行、品質運氣高'},
+  {id:'coral',  name:'珊瑚汽泡', cost:0,time:720, base:520, color:'#ff7f7f',lvl:0,gen:2,trait:'thirsty spark',       tname:'珊瑚',  tdesc:'愛喝水，帶動相鄰作物'},
+  {id:'eclipse',name:'日蝕金冠', cost:0,time:1800,base:1100,color:'#5a3a8a',lvl:0,gen:2,trait:'night heirloom spark',tname:'日蝕',  tdesc:'夜行，品質運氣高，帶動相鄰作物'},
+  {id:'teatime',name:'午後花園', cost:0,time:900, base:600, color:'#9fe0a0',lvl:0,gen:2,trait:'hardy lucky',         tname:'午茶',  tdesc:'不怕乾，品質運氣高'},
+  {id:'abyss',  name:'深淵龍鬚', cost:0,time:3000,base:2400,color:'#2fb8a8',lvl:0,gen:3,trait:'thirsty night lucky', tname:'深淵',  tdesc:'愛喝水、夜行、品質運氣極高'},
+  {id:'skygarden',name:'天空樹', cost:0,time:2700,base:2200,color:'#b8f0ff',lvl:0,gen:3,trait:'hardy lucky spark',   tname:'天空',  tdesc:'不怕乾、品質運氣高、帶動相鄰作物'},
+  {id:'cosmos', name:'宇宙之心', cost:0,time:5400,base:6000,color:'#ff5ad0',lvl:0,gen:4,trait:'lucky heirloom spark night',tname:'宇宙',tdesc:'夜行，品質運氣極高，帶動相鄰作物'},
   /* 合作配種才拿得到 */
   {id:'friendleaf',name:'友情草',  cost:0,time:180,base:160,color:'#ffb3c7',lvl:0,gen:1,coop:1,trait:'hardy lucky',      tname:'友情',  tdesc:'和朋友合作配種才拿得到，不怕乾、品質運氣高'},
   {id:'twinstar',  name:'雙子星雲',cost:0,time:900,base:900,color:'#9fe3ff',lvl:0,gen:2,coop:1,trait:'night spark lucky',tname:'雙子星',tdesc:'兩個配種品種合作才配得出，夜行、帶動相鄰、品質運氣高'},
@@ -31,11 +44,17 @@ var RECIPES=[
   {a:'lazy',b:'lazy',out:'clover',ch:0.12},{a:'lazy',b:'purple',out:'mint',ch:0.55},{a:'lazy',b:'lemon',out:'lime',ch:0.55},
   {a:'purple',b:'lemon',out:'grape',ch:0.55},{a:'lemon',b:'milk',out:'aurora',ch:0.5},{a:'milk',b:'gold',out:'moon',ch:0.45},
   {a:'mint',b:'grape',out:'rainbow',ch:0.4},{a:'lime',b:'grape',out:'typhoon',ch:0.4},{a:'aurora',b:'moon',out:'galaxy',ch:0.3},
-  {a:'rainbow',b:'galaxy',out:'phoenix',ch:0.2}
+  {a:'rainbow',b:'galaxy',out:'phoenix',ch:0.2},
+  {a:'lazy',b:'milk',out:'cotton',ch:0.5},{a:'purple',b:'milk',out:'bubble',ch:0.5},{a:'lemon',b:'gold',out:'honey',ch:0.45},
+  {a:'purple',b:'gold',out:'lavender',ch:0.45},{a:'milk',b:'milk',out:'cocoa',ch:0.15},
+  {a:'clover',b:'cotton',out:'dream',ch:0.35},{a:'bubble',b:'typhoon',out:'coral',ch:0.35},{a:'honey',b:'moon',out:'eclipse',ch:0.3},
+  {a:'lavender',b:'cocoa',out:'teatime',ch:0.35},
+  {a:'coral',b:'eclipse',out:'abyss',ch:0.2},{a:'dream',b:'teatime',out:'skygarden',ch:0.2},
+  {a:'phoenix',b:'abyss',out:'cosmos',ch:0.1}
 ];
 var WX=[{id:'sun',n:'晴天',d:'一切正常'},{id:'rain',n:'雨天',d:'自動澆水'},{id:'heat',n:'熱浪',d:'長得快，水也乾得快'},{id:'fog',n:'起霧',d:'品質運氣提高'},{id:'bow',n:'彩虹',d:'品質運氣大增'}];
 var SEASONS=['春','夏','秋','冬'];
-var SEASON_OF={lazy:0,clover:0,mint:0,lime:0,lemon:1,grape:1,typhoon:1,purple:2,gold:2,moon:2,rainbow:2,milk:3,aurora:3,galaxy:3,phoenix:3,friendleaf:0,twinstar:3,maple:2,snow:3,hongbao:0};
+var SEASON_OF={lazy:0,clover:0,mint:0,lime:0,lemon:1,grape:1,typhoon:1,purple:2,gold:2,moon:2,rainbow:2,milk:3,aurora:3,galaxy:3,phoenix:3,friendleaf:0,twinstar:3,maple:2,snow:3,hongbao:0,cotton:3,bubble:1,honey:1,lavender:0,cocoa:3,dream:3,coral:1,eclipse:2,teatime:0,abyss:1,skygarden:0,cosmos:3};
 var TRIPS=[{n:'30 分',ms:1800000,rolls:1},{n:'2 小時',ms:7200000,rolls:3},{n:'8 小時',ms:28800000,rolls:8}];
 var GOODS={juice:{name:'綜合果汁',desc:'兩種作物榨的，價格固定，不受行情和飽和影響。'},jam:{name:'手工果醬',desc:'三株同品種熬的，價格固定，不受行情和飽和影響。'}};
 var PLOT_COST=[0,0,0,50,150,400,1000,2500,6000];
@@ -56,7 +75,13 @@ var PETS=[
   {id:'chick',name:'小雞啾啾',  rar:0,base:0.20,label:'收成經驗',   cost:{coins:150},        pace:60, hop:1,faceRight:true},
   {id:'cat',  name:'橘貓麻糬',  rar:1,base:0.10,label:'品質運氣', cost:{cat:3},            pace:90, hop:0,faceRight:false},
   {id:'dog',  name:'柴犬阿福',  rar:2,base:0.25,label:'裝傻成功率', cost:{coins:600},        pace:50, hop:0,faceRight:true},
-  {id:'alien',name:'外星寶寶咕嚕',rar:3,base:0.15,label:'成長速度', cost:{item:'meteor',n:2},pace:120,hop:1,faceRight:true}
+  {id:'alien',name:'外星寶寶咕嚕',rar:3,base:0.15,label:'成長速度', cost:{item:'meteor',n:2},pace:120,hop:1,faceRight:true},
+  {id:'frog', name:'青蛙呱呱',  rar:1,base:0.30,label:'澆水撐得更久', cost:{stat:'fish',n:10,how:'釣到魚'},     pace:70, hop:1,faceRight:true},
+  {id:'bunny',name:'兔子棉棉',  rar:1,base:0.15,label:'收成退回種子機率',cost:{stat:'harvest',n:150,how:'收成作物'},pace:45,hop:1,faceRight:true},
+  {id:'owl',  name:'貓頭鷹咕咕',rar:2,base:0.08,label:'配種成功率', cost:{stat:'breed',n:8,how:'配種成功'},    pace:140,hop:0,faceRight:true},
+  {id:'fox',  name:'狐狸小紅',  rar:2,base:0.08,label:'市場售價',   cost:{stat:'help',n:10,how:'幫好友澆水'},  pace:55, hop:0,faceRight:true},
+  {id:'hog',  name:'刺蝟球球',  rar:3,base:0.25,label:'探險收穫',   cost:{trip:1},                              pace:150,hop:0,faceRight:true},
+  {id:'dragon',name:'小龍阿焰', rar:4,base:0.12,label:'品質運氣',   cost:{item:'fish5',n:1,crop:'phoenix'},     pace:80, hop:1,faceRight:true}
 ];
 var ACH=[
   {id:'first', name:'第一次收成',   desc:'收成 1 株',           reward:20,  ok:function(s){return s.stats.harvest>=1;}},
@@ -75,6 +100,7 @@ var ACH=[
   {id:'breed1',name:'育種新手',     desc:'配出第 1 個新品種',   reward:200, ok:function(s){return Object.keys(s.known||{}).length>=1;}},
   {id:'breedA',name:'育種大師',     desc:'發現全部 10 個新品種',reward:8000,ok:function(s){return Object.keys(s.known||{}).length>=10;}},
   {id:'decorA',name:'室內設計師',   desc:'買齊全部農場裝飾',     reward:5000,ok:function(s){return Object.keys(s.decor||{}).length>=8;}},
+  {id:'zoo2',  name:'萬獸之王',     desc:'收集全部 10 隻寵物',   reward:6000,ok:function(s){return Object.keys(s.pets||{}).length>=10;}},
   {id:'dexHalf',name:'圖鑑收藏家',   desc:'圖鑑完成一半',         reward:3000,ok:function(s){return Object.keys(s.dex||{}).length>=45;}}
 ];
 /* 農場裝飾：買了就會出現在農場上，每 1 點魅力讓市場售價 +1% */
