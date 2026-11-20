@@ -791,7 +791,11 @@ function completeSetup(){
   if(nm.length<2||nm.length>12){ gmsg('名稱要 2 到 12 個字',1); return; }
   if(!gate.gender){ gmsg('選一個性別',1); return; }
   authBusy=true; gmsg('建立你的角色…');
-  sb.from('profiles').upsert({id:user.id,name:nm,gender:gate.gender,seen_at:new Date().toISOString()}).then(function(r){
+  var prow={name:nm,gender:gate.gender,seen_at:new Date().toISOString()};
+  sb.from('profiles').update(prow).eq('id',user.id).select('id').then(function(r){
+    if(!r.error&&r.data&&r.data.length) return r;
+    return sb.from('profiles').insert({id:user.id,name:nm,gender:gate.gender,seen_at:prow.seen_at});
+  }).then(function(r){
     if(r.error){ authBusy=false; gmsg(/duplicate|unique/i.test(r.error.message)?'這個名字已經有人用了，換一個':authErr(r.error.message),1); return; }
     gmsg('幫你在小鎮上找一塊地…');
     return claimHome().then(function(lot){
