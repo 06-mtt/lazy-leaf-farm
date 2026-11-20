@@ -77,19 +77,19 @@ var PETS=[
   {id:'dog',  name:'柴犬阿福',  rar:2,base:0.25,label:'裝傻成功率', cost:{coins:600},        pace:50, hop:0,faceRight:true},
   {id:'alien',name:'外星寶寶咕嚕',rar:3,base:0.15,label:'成長速度', cost:{item:'meteor',n:2},pace:120,hop:1,faceRight:true},
   {id:'frog', name:'青蛙呱呱',  rar:1,base:0.30,label:'澆水撐得更久', cost:{stat:'fish',n:10,how:'釣到魚'},     pace:70, hop:1,faceRight:true},
-  {id:'bunny',name:'兔子棉棉',  rar:1,base:0.15,label:'收成退回種子機率',cost:{stat:'harvest',n:150,how:'收成作物'},pace:45,hop:1,faceRight:true},
+  {id:'bunny',name:'兔子棉棉',  rar:1,base:0.15,label:'收成退回種子機率',cost:{stat:'harvest',n:750,how:'收成作物'},pace:45,hop:1,faceRight:true},
   {id:'owl',  name:'貓頭鷹咕咕',rar:2,base:0.08,label:'配種成功率', cost:{stat:'breed',n:8,how:'配種成功'},    pace:140,hop:0,faceRight:true},
   {id:'fox',  name:'狐狸小紅',  rar:2,base:0.08,label:'市場售價',   cost:{stat:'help',n:10,how:'幫好友澆水'},  pace:55, hop:0,faceRight:true},
   {id:'hog',  name:'刺蝟球球',  rar:3,base:0.25,label:'探險收穫',   cost:{trip:1},                              pace:150,hop:0,faceRight:true},
   {id:'dragon',name:'小龍阿焰', rar:4,base:0.12,label:'品質運氣',   cost:{item:'fish5',n:1,crop:'phoenix'},     pace:80, hop:1,faceRight:true}
 ];
 var ACH=[
-  {id:'first', name:'第一次收成',   desc:'收成 1 株',           reward:20,  ok:function(s){return s.stats.harvest>=1;}},
-  {id:'h50',   name:'綠手指',       desc:'收成 50 株',          reward:300, ok:function(s){return s.stats.harvest>=50;}},
-  {id:'h300',  name:'農場老手',     desc:'收成 300 株',         reward:2000,ok:function(s){return s.stats.harvest>=300;}},
+  {id:'first', name:'第一次收成',   desc:'收成 1 次',           reward:20,  ok:function(s){return s.stats.harvest>=1;}},
+  {id:'h50',   name:'綠手指',       desc:'收成 250 個',         reward:300, ok:function(s){return s.stats.harvest>=250;}},
+  {id:'h300',  name:'農場老手',     desc:'收成 1,500 個',       reward:2000,ok:function(s){return s.stats.harvest>=1500;}},
   {id:'rich',  name:'小有積蓄',     desc:'累積賺到 5,000 金幣', reward:500, ok:function(s){return s.stats.earned>=5000;}},
   {id:'land',  name:'大地主',       desc:'解鎖全部 9 塊地',     reward:1500,ok:function(s){return s.plots.every(function(p){return p.u;});}},
-  {id:'gold',  name:'阿嬤的驕傲',   desc:'收成 1 株黃金阿嬤',   reward:800, ok:function(s){return s.stats.gold>=1;}},
+  {id:'gold',  name:'阿嬤的驕傲',   desc:'收成 1 次黃金阿嬤',   reward:800, ok:function(s){return s.stats.gold>=1;}},
   {id:'bluff', name:'九層塔大師',   desc:'對警察裝傻成功 3 次', reward:400, ok:function(s){return s.stats.bluff>=3;}},
   {id:'cat',   name:'貓奴',         desc:'摸流浪貓 5 次',       reward:150, ok:function(s){return s.stats.cat>=5;}},
   {id:'ufo',   name:'第三類接觸',   desc:'被幽浮光顧 1 次',     reward:200, ok:function(s){return s.stats.ufo>=1;}},
@@ -161,17 +161,46 @@ var BUILDINGS=[
   {id:'garden',name:'花園',per:100,c:'#ef7a8a',desc:'每 5 格讓農場魅力 +1（所有花園合計最多 +30）'}
 ];
 /* 釣魚：w 是上鉤機率的權重 */
-var FISH=[{id:'fish1',w:50,c:'#9a8fb8'},{id:'fish2',w:28,c:'#f4f1ea'},{id:'fish3',w:15,c:'#5aa0f2'},{id:'fish4',w:5.5,c:'#b06cf0'},{id:'fish5',w:1.5,c:'#f5c451'}];
+/* 魚：w 是上鉤機率的權重；wx 限定天氣、night 限定夜晚(1)或白天(0)、bait 是最低魚餌等級（1 魚餌、2 高級魚餌）；size 是公分範圍 */
+var FISH=[
+  {id:'fish1', w:50, c:'#9a8fb8',size:[6,15]},
+  {id:'fish2', w:28, c:'#f4f1ea',size:[20,60]},
+  {id:'fish3', w:15, c:'#5aa0f2',size:[5,20]},
+  {id:'fish4', w:5.5,c:'#b06cf0',size:[30,90]},
+  {id:'fish5', w:1.5,c:'#f5c451',size:[40,120]},
+  {id:'fish6', w:25, c:'#8a7a5a',size:[8,20],  wx:['rain']},
+  {id:'fish7', w:18, c:'#6a8a9a',size:[30,100],bait:1},
+  {id:'fish8', w:12, c:'#7ff0d8',size:[4,12],  bait:1,night:1},
+  {id:'fish9', w:12, c:'#ffb347',size:[10,25], bait:1,night:0,wx:['sun','heat']},
+  {id:'fish10',w:6,  c:'#cfd8e8',size:[15,40], bait:1,wx:['fog']},
+  {id:'fish11',w:5,  c:'#5a4a9a',size:[40,130],bait:2,night:1},
+  {id:'fish12',w:3,  c:'#ff8ad0',size:[25,70], bait:1,wx:['bow']},
+  {id:'fish13',w:1.5,c:'#ffd700',size:[60,150],bait:2}
+];
+/* 釣魚體力：上限 30，每 8 分鐘回 1（約 4 小時回滿） */
+var FISH_EN={max:30,regen:480000};
 ITEMS.push(
-  {id:'fish1',name:'小溪魚',rar:0,value:20,  desc:'池塘裡最常見的小魚。'},
-  {id:'fish2',name:'鯉魚',  rar:1,value:60,  desc:'肥肥的，阿嬤說可以煮湯。'},
-  {id:'fish3',name:'金魚',  rar:2,value:180, desc:'不知道誰放生的。'},
-  {id:'fish4',name:'錦鯉',  rar:3,value:600, desc:'身上的花紋像一幅畫。'},
-  {id:'fish5',name:'龍魚',  rar:4,value:2500,desc:'傳說釣到的人會走運一整年。'}
+  {id:'fish1', name:'小溪魚',  rar:0,value:20},
+  {id:'fish2', name:'鯉魚',    rar:1,value:60},
+  {id:'fish3', name:'金魚',    rar:2,value:180},
+  {id:'fish4', name:'錦鯉',    rar:3,value:600},
+  {id:'fish5', name:'龍魚',    rar:4,value:2500},
+  {id:'fish6', name:'泥鰍',    rar:0,value:30},
+  {id:'fish7', name:'鯰魚',    rar:1,value:90},
+  {id:'fish8', name:'螢光魚',  rar:2,value:220},
+  {id:'fish9', name:'太陽魚',  rar:2,value:200},
+  {id:'fish10',name:'霧隱魚',  rar:3,value:700},
+  {id:'fish11',name:'月光鰻',  rar:3,value:800},
+  {id:'fish12',name:'彩虹鱒',  rar:4,value:2200},
+  {id:'fish13',name:'黃金鯉王',rar:4,value:3000}
 );
+/* 寵物成長：餵食累積經驗，達到門檻升一級（最高 5 級）。每隻每天最多餵 10 次 */
+var PET_LV=[30,90,200,400,800], PET_FEED_MAX=10, FEED_FISH=[3,6,12,25,60], FEED_CROP=[1,1,2,3,5,8];
 ACH.push(
   {id:'land3', name:'包租公',   desc:'在小鎮買下 3 塊地',reward:2000,ok:function(s){return Object.keys(s.land||{}).length>=3;}},
-  {id:'dragon',name:'釣魚高手', desc:'釣到一條龍魚',     reward:3000,ok:function(s){return (s.items||{}).fish5!==undefined;}}
+  {id:'dragon',name:'釣魚高手', desc:'釣到一條龍魚',     reward:3000,ok:function(s){return (s.items||{}).fish5!==undefined;}},
+  {id:'fishdex',name:'魚類博士', desc:'釣到全部 13 種魚',  reward:6000,ok:function(s){return Object.keys(s.fishRec||{}).length>=13;}},
+  {id:'petmax', name:'最佳拍檔', desc:'把一隻寵物養到成長 5 級',reward:5000,ok:function(s){return Object.keys(s.pets||{}).some(function(k){return (s.pets[k].exp||0)>=800;});}}
 );
 /* 雲端：Supabase 專案的網址和公開金鑰。這把金鑰本來就是給網頁用的，可以公開；
    資料靠資料庫裡的規則保護，每個人只能讀寫自己的存檔 */
