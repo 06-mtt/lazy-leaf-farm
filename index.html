@@ -12,7 +12,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <title>懶草農場</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 
 </head>
 <body>
@@ -23,7 +23,7 @@
     <div id="xpwrap"><div id="lvl"></div><div id="xpbar"><div id="xpfill"></div></div></div>
     <div id="wx"></div>
   </div>
-  <div id="stage"><canvas id="cv" width="160" height="200"></canvas><div id="labels"></div><div id="picker"></div></div>
+  <div id="stage"><canvas id="cv" width="160" height="200"></canvas><div id="labels"></div><div id="quick"></div><div id="picker"></div></div>
   <div id="panel"><header><div><h2 id="ptitle"></h2><span id="psub"></span></div><button type="button" id="pclose" aria-label="關閉">✕</button></header><div id="plist"></div></div>
   <div id="tabs">
     <button type="button" data-tab="bag"><img alt="" data-ti="bag"><span>背包</span><em id="b_bag"></em></button>
@@ -32,14 +32,15 @@
     <button type="button" id="go"><img alt="" data-ti="town" id="goicon"><span id="golbl">去小鎮</span></button>
     <button type="button" data-tab="upg"><img alt="" data-ti="menu"><span>更多</span><em id="b_upg"></em></button>
   </div>
+  <div id="fishview"><div id="fwrap"><canvas id="fcv" width="96" height="54"></canvas></div><div id="fmsg"></div><div id="fbtns"></div></div>
   <div id="toast"></div>
   <div id="modal"><div id="mbox"><canvas id="mart" width="12" height="10"></canvas><h3 id="mtitle"></h3><div id="mbody"></div><div id="mbtns"></div></div></div>
   <div id="gate"><div id="gbox"><img id="glogo" alt=""><h1>懶草農場</h1><div id="gbody"></div></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="data.js?v=18"></script>
-<script src="game.js?v=18"></script>
+<script src="data.js?v=19"></script>
+<script src="game.js?v=19"></script>
 
 </body>
 </html>

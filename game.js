@@ -7,9 +7,11 @@
 
 /* 天氣每 30 分鐘換一次、季節每 3 天換一次，都由時間決定，之後所有玩家會看到同樣的天氣 */
 
-function weather(now){ var r=rnd(Math.floor(now/3600000)*17+3); return WX[r<0.45?0:(r<0.67?1:(r<0.82?2:(r<0.95?3:4)))]; }
+var TOFF=0;
+function WT(now){ return now+TOFF; }
+function weather(now){ var r=rnd(Math.floor(WT(now)/3600000)*17+3); return WX[r<0.45?0:(r<0.67?1:(r<0.82?2:(r<0.95?3:4)))]; }
 
-function season(now){ return Math.floor(now/259200000)%4; }
+function season(now){ return Math.floor(WT(now)/259200000)%4; }
 
 function inSeason(st,now){ return SEASON_OF[st.id]===season(now); }
 
@@ -62,7 +64,11 @@ function normalize(){
   if(!SMAP[S.seed]) S.seed='lazy';
   S.fishing=S.fishing||{en:FISH_EN.max,t:Date.now()}; S.bait=S.bait||{b:0,f:0};
   if(!S.fishRec){ S.fishRec={}; FISH.forEach(function(f){ if(S.items[f.id]!==undefined) S.fishRec[f.id]={n:1,max:0}; }); }
-  S.log=S.log||[]; S.plots.forEach(function(p){ if(p.crop&&!p.n) p.n=5+Math.floor(Math.random()*6); });
+  S.log=S.log||[];
+  if(S.upg.sprinkler){ S.upg.sprinkler=0; S.coins+=800; var nw=Date.now(); S.plots.forEach(function(p){ if(p.crop&&SMAP[p.crop]) p.water=nw+waterSpan(SMAP[p.crop]); }); S.log.unshift({t:nw,m:'自動灑水器取消了，退還 800 金幣；作物要記得澆水'}); }
+  var gsum=(S.job?S.job.v:0)+S.goods.reduce(function(a,g){ return a+(g.v||0); },0);
+  if(gsum){ S.coins+=gsum; S.job=null; S.goods=[]; S.log.unshift({t:Date.now(),m:'果汁和果醬取消了，手上的換成 '+gsum+' 金幣'}); }
+  S.plots.forEach(function(p){ if(p.crop&&!p.n) p.n=5+Math.floor(Math.random()*6); });
 }
 normalize();
 function hearts(id){ return S.pets[id]?Math.min(5,Math.floor(S.pets[id].aff/4)):0; }
@@ -105,19 +111,18 @@ function give(id,n){ S.items[id]=(S.items[id]||0)+(n||1); }
 /* ---------- 規則 ---------- */
 function rnd(n){ var x=Math.sin(n*12.9898)*43758.5453; return x-Math.floor(x); }
 function price(s,now){
-  var bucket=Math.floor(now/60000);
-  var mult=0.7+0.8*rnd(bucket*31+s.idx*7+1);
-  return Math.max(1,Math.round(s.base*mult*(1+0.1*S.upg.speaker)*(inSeason(s,now)?1.15:1)*(1+0.01*charmPts())*(1+petBonus('fox'))*evMul('sell')));
+  return Math.max(1,Math.round(s.base*priceMult(s,now)*(1+0.1*S.upg.speaker)*(inSeason(s,now)?1.15:1)*(1+0.01*charmPts())*(1+petBonus('fox'))*evMul('sell')));
 }
+function priceMult(s,now){ return 0.7+0.8*rnd(Math.floor(WT(now)/10800000)*31+s.idx*7+1); }
 function charmPts(){
   var g=0; Object.keys(S.land).forEach(function(k){ var o=S.land[k], l=LOTMAP[k]; if(o.b==='garden'&&l) g+=Math.floor(l.sw*l.sh/5); });
   return DECOR.reduce(function(a,x){ return a+(S.decor[x.id]?x.charm:0); },0)+Math.min(30,g);
 }
 function landYield(l,o,now){ var hrs=Math.min(8,(now-o.t)/3600000), area=l.sw*l.sh; return o.b==='inn'?Math.floor(hrs*area*10):(o.b==='green'?Math.floor(hrs*area/10):0); }
-function week(now){ return Math.floor(now/604800000); }
+function week(now){ return Math.floor(WT(now)/604800000); }
 function isBase(x){ return !x.gen&&!x.ev; }
-function twDate(now){ return new Date(now+8*3600000).toISOString().slice(0,10); }
-function activeEvents(now){ var ds=twDate(now), wd=new Date(now+8*3600000).getUTCDay(); return EVENTS_CAL.filter(function(e){ return e.weekly?e.weekly.indexOf(wd)>=0:(ds>=e.from&&ds<=e.to); }); }
+function twDate(now){ return new Date(WT(now)+8*3600000).toISOString().slice(0,10); }
+function activeEvents(now){ var ds=twDate(now), wd=new Date(WT(now)+8*3600000).getUTCDay(); return EVENTS_CAL.filter(function(e){ return e.weekly?e.weekly.indexOf(wd)>=0:(ds>=e.from&&ds<=e.to); }); }
 function evOn(id){ return activeEvents(Date.now()).some(function(e){ return e.id===id; }); }
 function evMul(k){ return activeEvents(Date.now()).reduce(function(a,e){ return a*(e[k]||1); },1); }
 function contestStrain(w){ var b=STRAINS.filter(isBase); return b[Math.floor(rnd(w*5+2)*b.length)]; }
@@ -198,6 +203,7 @@ function toast(msg){
   var el=$('toast'); el.textContent=msg; el.classList.add('show');
   clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove('show'); },2200);
 }
+function trendChip(s,now){ var m=priceMult(s,now); return m>=1.2?'<span class="chip gold">行情 ▲'+Math.round((m/1.1-1)*100)+'%</span>':(m<=0.9?'<span class="chip down">行情 ▼'+Math.round((1-m/1.1)*100)+'%</span>':''); }
 function coinTxt(n){ return '<img class="ci" alt="" src="'+TICON.coin+'">'+nf(n); }
 function nf(n){ return Math.round(n).toLocaleString('en-US'); }
 function badge(id,n,pre){ var el=$(id); if(!el) return; var t=n>0?pre+(n>99?'99+':n):''; if(el.textContent!==t) el.textContent=t; }
@@ -451,8 +457,87 @@ function homeLot(){ return LOTMAP[S.home]||HOMEPOOL[0]; }
 var town={cx:0,cy:0,vx:0,vy:0,drag:null,moved:false};
 function centerOn(x,y){ town.cx=clamp(x-W/2,0,TW-W); town.cy=clamp(y-H/2,0,TH-H); town.vx=town.vy=0; }
 var NPC=[{x:300,y:345,ax:'x',lo:30,hi:920,dir:1,sp:9,c:{hair:'#e6e0f0',skin:'#f2c9a0',shirt:'#b48cf2',pants:'#5e4a82'}},{x:483,y:200,ax:'y',lo:70,hi:630,dir:-1,sp:12,c:{hat:'#4a6fd0',skin:'#f2c9a0',shirt:'#4a6fd0',pants:'#2a2148'}}];
-var fish={st:'idle',msg:'',t1:0,t2:0,bait:'',bl:0};
-function fishReset(){ clearTimeout(fish.t1); clearTimeout(fish.t2); fish.st='idle'; fish.msg=''; }
+var fish={st:'idle',msg:'',t1:0,t2:0,bait:'',bl:0,view:false,res:null,t0:0};
+function fishReset(){ clearTimeout(fish.t1); clearTimeout(fish.t2); fish.st='idle'; fish.msg=''; if(fish.view){ fish.view=false; $('fishview').classList.remove('open'); } }
+/* 釣魚畫面：拋竿後蓋住下半個畫面。等 4 秒到 2 分鐘才上鉤，拉起來有一半機率是空竿 */
+var fctx=$('fcv').getContext('2d'); fctx.imageSmoothingEnabled=false;
+function fishUI(){
+  var en=fishEn(Date.now()), m=fish.st==='wait'?'浮標在水面上晃…等牠沉下去':(fish.st==='bite'?'上鉤了！快拉！':fish.msg);
+  $('fmsg').innerHTML='<b>'+esc(m)+'</b><small>釣魚體力 '+en+' / '+FISH_EN.max+(fish.bl?'・'+(fish.bl===2?'高級魚餌':'魚餌'):'')+'</small>';
+  $('fbtns').innerHTML=fish.st==='done'?'<button class="btn" data-f="cast"'+(en>0?'':' disabled')+'>再拋一竿</button><button class="btn ghost" data-f="close">收工</button>'
+    :'<button class="btn pull'+(fish.st==='bite'?' alt':' ghost')+'" data-f="pull">拉竿</button><button class="btn ghost" data-f="close">收竿</button>';
+}
+function fishCast(){
+  var now=Date.now();
+  if(fishEn(now)<1){ sfx('err'); toast('釣魚體力用完了，'+fmt((FISH_EN.regen-(now-S.fishing.t))/1000)+'後回 1 點'); return; }
+  clearTimeout(fish.t1); clearTimeout(fish.t2);
+  S.fishing.en--; if(S.fishing.en===FISH_EN.max-1) S.fishing.t=now;
+  fish.bl=baitLv(); if(fish.bl===2) S.bait.f--; else if(fish.bl===1) S.bait.b--;
+  fish.st='wait'; fish.res=null; fish.t0=performance.now(); fish.view=true; $('fishview').classList.add('open'); sfx('water');
+  var maxW=fish.bl===2?60000:(fish.bl===1?90000:120000);
+  fish.t1=setTimeout(function(){ fish.st='bite'; fish.t0=performance.now(); sfx('open'); fishUI();
+    fish.t2=setTimeout(function(){ if(fish.st==='bite') fishDone({k:'miss'},'太慢了，魚跑掉了'); },2000); },4000+Math.random()*(maxW-4000));
+  fishUI(); Store.save(S);
+}
+function fishDone(res,msg){ clearTimeout(fish.t1); clearTimeout(fish.t2); fish.st='done'; fish.res=res; fish.msg=msg; fish.t0=performance.now(); fishUI(); checkAch(); hud(); refreshPanel(); Store.save(S); }
+function fishPull(){
+  var now=Date.now();
+  if(fish.st==='wait'){ sfx('err'); fishDone({k:'miss'},'太早了，魚被嚇跑了'); return; }
+  if(fish.st!=='bite') return;
+  if(Math.random()<0.5){ sfx('err'); fishDone({k:'none'},'拉起來什麼都沒有，只勾到水草'); return; }
+  var bl=fish.bl, pool=FISH.filter(function(f){ return fishOk(f,now,bl); }), tw=0, fr, fc=pool[0];
+  pool.forEach(function(f){ f._w=f.w*(bl===2&&IMAP[f.id].rar>=3?2:1); tw+=f._w; });
+  fr=Math.random()*tw; for(var fi=0;fi<pool.length;fi++){ fc=pool[fi]; if(fr<fc._w) break; fr-=fc._w; }
+  var cm=Math.round(fc.size[0]+(fc.size[1]-fc.size[0])*Math.pow(Math.random(),2)), rec=S.fishRec[fc.id]||(S.fishRec[fc.id]={n:0,max:0}), isNew=!rec.n, big=cm>rec.max;
+  rec.n++; if(big) rec.max=cm;
+  give(fc.id); S.stats.fish++; sfx('harvest',IMAP[fc.id].rar);
+  if(isNew||IMAP[fc.id].rar>=3) logAdd('釣到「'+IMAP[fc.id].name+'」'+cm+' 公分');
+  fishDone({k:'fish',id:fc.id,rar:IMAP[fc.id].rar},'釣到「'+IMAP[fc.id].name+'」'+cm+' 公分（'+RAR[IMAP[fc.id].rar].n+'）'+(isNew?'，第一次釣到！':(big?'，新紀錄！':'')));
+}
+$('fishview').addEventListener('click',function(e){ var b=e.target.closest('button[data-f]'); if(!b||b.disabled) return;
+  if(b.dataset.f==='pull') fishPull(); else if(b.dataset.f==='cast') fishCast(); else { var m=fish.st==='done'?fish.msg:''; fishReset(); fish.msg=m; refreshPanel(); } });
+function drawFishView(t){
+  if(!fish.view) return;
+  var c=fctx, FW=96, FH=54, i, dt=t-fish.t0, st=fish.st, res=fish.res, sh=st==='bite'?Math.round(Math.sin(t/40)):0;
+  function fp(x,y,w,h,col){ c.fillStyle=col; c.fillRect(Math.round(x)+sh,Math.round(y),w,h); }
+  function big(b,x,y,sc,flip){ for(var r=0;r<b.rows.length;r++) for(var k=0,L=b.rows[r].length;k<L;k++){ var ch=b.rows[r][k]; if(ch!=='.') fp(x+(flip?L-1-k:k)*sc,y+r*sc,sc,sc,b.pal[ch]); } }
+  fp(-2,0,FW+4,10,'#3d2a5e'); fp(-2,6,FW+4,4,'#8f4a7c'); fp(-2,9,FW+4,3,'#4d7a5a');
+  for(i=0;i<FW;i+=7) fp(i,7+((i*5)%3),2,3,'#3a6b45');
+  var wc=['#3f7fae','#3a74a3','#356a98','#30608c','#2b5680','#274d74'];
+  for(i=0;i<6;i++) fp(-2,12+i*7,FW+4,7,wc[i]);
+  for(i=0;i<14;i++){ var wx0=(i*29+Math.floor(t/90))%(FW+10)-5, wy=14+(i*17)%38; fp(wx0,wy,5,1,'#5b9bc8'); }
+  fp(4,40,9,4,'#3f8f4a'); fp(6,39,5,1,'#3f8f4a'); fp(10,41,2,1,'#2b5680'); fp(80,22,8,3,'#3f8f4a'); fp(86,23,2,1,'#356a98');
+  for(i=0;i<3;i++){ fp(1+i*3,20-i*2,1,24+i*2,'#2f6b45'); fp(90+i*2,26-i*3,1,22+i*3,'#2f6b45'); }
+  for(i=0;i<2;i++){ var fx=((t/(50+i*23)+i*60)%(FW+30))-15, fy=34+i*9; fp(fx,fy,9,3,'#234766'); fp(fx-3,fy+1,3,1,'#234766'); }
+  var bx=48, by=28;
+  if(st==='wait'||st==='bite'){
+    var bob=st==='bite'?4+Math.round(Math.abs(Math.sin(t/70))*2):Math.round(Math.sin(t/420)*1.2);
+    var rp=(dt%2400)/2400, rw=4+rp*22; if(st==='wait'&&rp<0.8){ fp(bx-rw/2,by+3,rw,1,'#7fb8de'); fp(bx-rw/2+2,by+5,rw-4,1,'#5b9bc8'); }
+    c.fillStyle='#f6e7c8'; for(i=0;i<26;i++) c.fillRect(Math.round(bx+1+i*1.8)+sh,Math.round(by-3+bob-i*0.95),1,1);
+    fp(bx-1,by-3+bob,3,2,'#ef4a4a'); fp(bx-1,by-1+bob,3,2,'#f6e7c8'); fp(bx,by-5+bob,1,2,'#2a2148');
+    if(st==='bite'){ for(i=0;i<6;i++){ var a=i*1.05+t/200, d=5+((t/30)%6); fp(bx+Math.cos(a)*d,by+1-Math.abs(Math.sin(a))*d,1,1,'#eafaff'); }
+      if(Math.floor(t/120)%2){ fp(bx-1,by-20,3,9,'#f5c451'); fp(bx-1,by-9,3,3,'#f5c451'); } }
+  } else if(res&&res.k==='fish'){
+    var b=BMP[res.id], sc=4, bw=b.rows[0].length*sc, bh=b.rows.length*sc, p=Math.min(1,dt/650), jy=by+8-Math.sin(p*Math.PI*0.5)*22, wob=p>=1?Math.round(Math.sin(t/260)*1.5):0;
+    if(p<1) for(i=0;i<8;i++){ var a2=i*0.8, d2=p*20; fp(bx+Math.cos(a2)*d2,by+6-Math.abs(Math.sin(a2))*d2*1.2+p*p*12,1,2,'#eafaff'); }
+    big(b,bx-bw/2,jy-bh/2+wob,sc,Math.floor(t/500)%2===0&&p>=1);
+    if(p>=1) for(i=0;i<7;i++){ var sx=bx+Math.cos(i*0.9+t/700)*(30+i%3*4), sy=jy+Math.sin(i*0.9+t/700)*14; if(Math.floor(t/200+i)%3){ fp(sx,sy,1,3,RAR[res.rar].c); fp(sx-1,sy+1,3,1,RAR[res.rar].c); } }
+  } else if(res&&res.k==='none'){
+    var sw=Math.round(Math.sin(t/300)*2); c.fillStyle='#f6e7c8'; for(i=0;i<14;i++) c.fillRect(bx+Math.round(sw*i/14),6+i,1,1);
+    fp(bx+sw-2,20,5,2,'#2f6b45'); fp(bx+sw-3,22,3,5,'#3f8f4a'); fp(bx+sw+1,22,2,7,'#2f6b45'); fp(bx+sw-1,27,2,4,'#3f8f4a');
+    if(Math.floor(t/400)%2) fp(bx+sw,32,1,2,'#7fd8f0');
+  } else {
+    var rq=(dt%1600)/1600; fp(bx-4-rq*12,by+2,8+rq*24,1,'#7fb8de'); fp(bx-2-rq*8,by+5,4+rq*16,1,'#5b9bc8');
+    fp(bx+20+dt/40%30,by+8,7,2,'#234766');
+  }
+}
+/* 小鎮捷徑：常用地點一排按鈕，點了直接開 */
+var QUICK=[['shop','商店'],['market','市場'],['lab','工坊'],['pond','池塘'],['land','地政所'],['post','郵局'],['dex','圖鑑館'],['contest','品評會'],['wear','服飾店']];
+$('quick').innerHTML=QUICK.map(function(q){ return '<button type="button" data-q="'+q[0]+'">'+q[1]+'</button>'; }).join('');
+$('quick').addEventListener('click',function(e){ var b=e.target.closest('button[data-q]'); if(!b||scene!=='town') return; var id=b.dataset.q, l=null;
+  if(id==='pond'){ var hl=homeLot(), bd=1e9; LOTS.forEach(function(x){ if(x.type==='pond'){ var d=Math.abs(x.x-hl.x)+Math.abs(x.y-hl.y); if(d<bd){ bd=d; l=x; } } }); }
+  else l=LOTS.filter(function(x){ return x.id===id; })[0];
+  if(l){ centerOn(l.x+l.w/2,l.y+l.h/2+30); sfx('open'); enterLot(l); } });
 var ME={};
 function syncLook(){
   var h=HATS.filter(function(x){return x.id===S.look.hat;})[0]||HATS[0], sh=SHIRTS.filter(function(x){return x.id===S.look.shirt;})[0]||SHIRTS[0];
@@ -647,7 +732,7 @@ function townClick(x,y){
   if(x>=mx&&y>=my&&x<mx+50&&y<my+37){ centerOn((x-mx)*20,(y-my)*20); return; }
   var wx=x+town.cx, wy=y+town.cy, hit=null;
   LOTS.forEach(function(l){ if(wx>=l.x&&wx<=l.x+l.w&&wy>=l.y&&wy<=l.y+l.h) hit=l; });
-  if(hit){ sfx('open'); enterLot(hit); }
+  if(hit&&!((hit.type==='house'||hit.type==='woods')&&hit.small)){ sfx('open'); enterLot(hit); }
 }
 cv.addEventListener('pointerdown',function(e){
   if(scene!=='town'||modalOpen) return;
@@ -674,7 +759,7 @@ function setScene(sc,keep){
   closePicker(); town.drag=null;
   if(sc==='town'&&keep){ loadWorld(); townStep(0); }
   else if(sc==='town'){ loadWorld(); var hl=homeLot(); centerOn(hl.x+7,hl.y+7); if(!S.townSeen) toast('拖曳可以移動地圖，點一塊地直接進入或查看'); S.townSeen=1; }
-  $('stage').style.background=sc==='town'?'#4d7a5a':'';
+  $('stage').style.background=sc==='town'?'#4d7a5a':''; $('quick').classList.toggle('open',sc==='town');
   updateLabels(); hud();
 }
 
@@ -686,7 +771,7 @@ function openPicker(i){
   var have=STRAINS.filter(function(s){ return S.seeds[s.id]>0; }).sort(function(a,b){ return (b.id===S.seed)-(a.id===S.seed); });
   pickI=i; sfx('open');
   el.innerHTML=have.length?'<div class="pkgrid">'+have.map(function(s){
-      return '<button type="button" class="pk" data-seed="'+s.id+'"><img alt="" src="'+ICON[s.id]+'"><b>'+S.seeds[s.id]+'</b><span>'+s.name+'</span>'+(p.prev?(p.prev===s.id?'<i class="down">連種</i>':'<i class="up">輪作</i>'):'')+'</button>'; }).join('')+'</div>'
+      return '<button type="button" class="pk" data-seed="'+s.id+'"><img alt="" src="'+ICON[s.id]+'"><b>'+S.seeds[s.id]+'</b><span>'+s.name+'</span>'+(priceMult(s,Date.now())>=1.2?'<u>行情好</u>':'')+(p.prev?(p.prev===s.id?'<i class="down">連種</i>':'<i class="up">輪作</i>'):'')+'</button>'; }).join('')+'</div>'
     :'<div class="pkempty">沒有種子</div><button type="button" class="btn" data-shop="1">去商店買</button>';
   if(have.length&&S.plots.filter(function(x){ return x.u&&!x.crop; }).length>1) el.innerHTML+='<button type="button" class="pkall'+(S.plantAll?' on':'')+'" data-all="1"><i></i>所有空地都種這個</button>';
   el.classList.add('open');
@@ -767,6 +852,7 @@ cv.addEventListener('click',function(e){
 var tab=null;
 var TABGRP={log:'upg',acct:'upg',friends:'upg',settings:'upg',mail:'upg',rank:'upg',admin:'upg',gift:'upg',coopPick:'upg'};
 function openTab(t){
+  if(fish.view&&t!==tab) fishReset();
   var prev=tab; tab=(tab===t)?null:t; petZoom=false; closePicker();
   $('panel').classList.toggle('open',!!tab);
   var g=TABGRP[tab]||tab;
@@ -994,7 +1080,7 @@ function visitFarm(owner){
       if(e.kind==='water'){ var st=SMAP[p.crop]; if(st){ if(e.at>p.last){ p.prog+=Math.max(0,Math.min(e.at,p.water)-p.last)/1000*(1+0.25*fert); p.last=e.at; } p.water=Math.max(p.water,e.at+Math.max(45,st.time*0.5)*1000); } }
       else { if(e.kind==='steal') p.stolen=(p.stolen||0)+(e.n||1); if(e.mine) p.mine=true; } });
     VISIT={owner:owner,name:d.name||'',gender:d.gender,lvl:d.lvl,added:d.added,mutual:d.mutual,fert:fert,fs:{plots:plots,decor:d.decor||{},pets:d.pets||{},me:lookOf(d.look,d.gender)}};
-    if(tab) closePanel(); scene='visit'; $('stage').style.background=''; updateLabels(); hud(); vTick(now);
+    if(tab) closePanel(); scene='visit'; $('stage').style.background=''; $('quick').classList.remove('open'); updateLabels(); hud(); vTick(now);
     toast('成熟的作物可以偷，乾掉的田可以澆水，點小屋看留言板'); MSGS=[];
   },function(){ toast('連線有問題，請再試一次'); });
 }
@@ -1084,7 +1170,7 @@ function coopAccept(sid,q){
 /* 排行榜、管理 */
 var RANK=null, RANKBY='dex', ADM={};
 function loadRank(){ if(!sb||!user) return; sb.rpc('leaderboard').then(function(r){ if(!r.error){ RANK=r.data||[]; if(tab==='rank'||tab==='contest') refreshPanel(); } },function(){}); }
-function checkAdmin(){ if(!sb||!user) return; sb.rpc('is_admin').then(function(r){ IS_ADMIN=!r.error&&r.data===true; if(tab==='upg') refreshPanel(); },function(){}); }
+function checkAdmin(){ if(!sb||!user) return; sb.rpc('now_ms').then(function(r){ if(!r.error&&r.data>0){ var d=r.data-Date.now(); TOFF=Math.abs(d)>20000?d:0; } },function(){}); sb.rpc('is_admin').then(function(r){ IS_ADMIN=!r.error&&r.data===true; if(tab==='upg') refreshPanel(); },function(){}); }
 function loadAdmin(){
   if(!IS_ADMIN) return;
   Promise.all([sb.rpc('admin_players'),sb.rpc('admin_cheats'),sb.rpc('admin_backups')]).then(function(rs){
@@ -1217,7 +1303,7 @@ function refreshPanel(){
       if(s.gen) return;
       if(s.ev&&!evOn(s.ev)) return;
       var lock=!s.ev&&S.lvl<s.lvl, have=S.seeds[s.id]||0;
-      h+='<div class="row'+(lock?' locked':'')+'"><img class="picon" alt="" style="--rar:var(--line)" src="'+ICON[s.id]+'"><div class="info"><strong>'+s.name+(inSeason(s,now)?'<span class="chip up">當季</span>':'')+(s.ev?'<span class="chip gold">活動</span>':'')+(have?'<span class="chip">持有 '+have+'</span>':'')+'</strong>'+
+      h+='<div class="row'+(lock?' locked':'')+'"><img class="picon" alt="" style="--rar:var(--line)" src="'+ICON[s.id]+'"><div class="info"><strong>'+s.name+(inSeason(s,now)?'<span class="chip up">當季</span>':'')+(s.ev?'<span class="chip gold">活動</span>':'')+trendChip(s,now)+(have?'<span class="chip">持有 '+have+'</span>':'')+'</strong>'+
         '<small>'+(lock?'LV '+s.lvl+' 解鎖':'成長 '+fmt(s.time/speed())+'　行情 '+s.base+'　一次收 5–10 株')+'</small><small>'+s.tname+'：'+s.tdesc+'</small>'+
         (lock?'':'<div class="buys">'+[1,10,50].map(function(n){ return '<button class="btn ghost" data-act="buyseed" data-id="'+s.id+':'+n+'"'+(S.coins>=s.cost*n?'':' disabled')+'>×'+n+'<em>'+nf(s.cost*n)+'</em></button>'; }).join('')+'</div>')+'</div></div>';
     });
@@ -1240,7 +1326,7 @@ function refreshPanel(){
       h+='<div class="logrow"><time>'+hm(e.t)+'</time><span>'+esc(e.m)+'</span></div>'; });
   } else if(tab==='bag'){
     title='背包'; sub='作物圖鑑 '+Object.keys(S.dex).length+' / '+STRAINS.length*6;
-    var BT=[['seed','種子'],['crop','作物'],['goods','加工品'],['item','雜物'],['fish','漁獲']];
+    var BT=[['seed','種子'],['crop','作物'],['item','雜物'],['fish','漁獲']]; if(bagTab==='goods') bagTab='crop';
     h+='<div class="seg">'+BT.map(function(b){ return '<button type="button" class="'+(bagTab===b[0]?'on':'')+'" data-act="bagtab" data-id="'+b[0]+'">'+b[1]+'</button>'; }).join('')+'</div>';
     h+='<div class="bagbar"><span class="legend">'+(bagTab==='crop'?RAR.map(function(r){return '<span><i style="background:'+r.c+'"></i>'+r.n+'</span>';}).join(''):'')+'</span><button type="button" class="btn ghost sm" data-act="bagall">'+(bagAll?'顯示：全部':'顯示：有的')+'</button></div>';
     var all=bagList(bagTab), sel=all.filter(function(x){return x.key===bagSel;})[0];
@@ -1257,12 +1343,7 @@ function refreshPanel(){
       var rc=findRecipe(A.id,B.id), ch=breedChance(A,B,rc);
       h+='<div class="row"><div class="info"><strong>'+(rc?((S.known[rc.out]||S.hint[rc.out])?'配種：可能得到「'+SMAP[rc.out].name+'」':'配種：這個組合好像有搞頭'):'配種：沒有配方，只能賭意外突變')+'</strong><small>成功率 '+Math.round(ch*100)+'%，各消耗 1 株，品質越高越容易成功</small></div><button class="btn" data-act="breed">配種</button></div>';
     }
-    var busy=!!S.job;
-    h+='<div class="row"><div class="info"><strong>榨果汁</strong><small>兩種不同品種各 1 株，1 分鐘，售價是兩株合計的 1.35 倍</small></div><button class="btn alt" data-act="juice"'+(A&&B&&A.id!==B.id&&!busy?'':' disabled')+'>開始</button></div>';
-    h+='<div class="row"><div class="info"><strong>熬果醬</strong><small>左邊那格的作物 3 株，2 分鐘，售價是三株合計的 1.15 倍</small></div><button class="btn alt" data-act="jam"'+(A&&A.n>=3&&!busy?'':' disabled')+'>開始</button></div>';
     h+='<div class="row"><div class="info"><strong>做魚餌<span class="chip">魚餌 '+S.bait.b+'</span><span class="chip">高級 '+S.bait.f+'</span></strong><small>左邊那格的作物 1 個做成 3 個魚餌；精良以上做成高級魚餌</small></div><button class="btn alt" data-act="bait"'+(A?'':' disabled')+'>製作</button></div>';
-    if(S.job){ var left=(S.job.until-now)/1000;
-      h+='<div class="row"><img class="picon" alt="" style="--rar:'+RAR[S.job.q].c+'" src="'+ICON[S.job.t]+'"><div class="info"><strong>'+GOODS[S.job.t].name+(left>0?' 製作中':' 做好了')+'</strong><small>'+(left>0?'還要 '+fmt(left):'價值 '+S.job.v+' 金幣')+'</small></div><button class="btn" data-act="collect"'+(left>0?' disabled':'')+'>領取</button></div>'; }
     var stacks=[]; STRAINS.forEach(function(s){ for(var q=5;q>=0;q--) if(S.inv[s.id][q]) stacks.push({key:s.id+':'+q,st:s,q:q,n:S.inv[s.id][q]}); });
     h+='<div class="sec">手上的作物</div>'+(stacks.length?'<div class="grid">'+stacks.map(function(x){
       return '<button type="button" class="card'+(x.key===labA||x.key===labB?' sel':'')+'" style="--rar:'+RAR[x.q].c+'" data-act="labpick" data-id="'+x.key+'"><b>'+x.n+'</b><img alt="" src="'+ICON[x.st.id]+'"><span>'+x.st.name+'</span></button>';
@@ -1317,11 +1398,10 @@ function refreshPanel(){
     } else if(L.type==='pond'){
       var en=fishEn(now), bl0=baitLv(), fpool=FISH.filter(function(f){ return fishOk(f,now,bl0); });
       sub='釣魚體力 '+en+' / '+FISH_EN.max;
-      h+='<div class="row"><div class="info"><strong>'+(fish.st==='wait'?'浮標在水面上晃…':(fish.st==='bite'?'上鉤了！快拉！':'水很清，看得到魚影'))+'</strong><small>'+(fish.msg||'浮標一沉就拉，太早或太慢魚會跑')+'</small></div>'+
-        (fish.st==='idle'?'<button class="btn" data-act="cast"'+(en>0?'':' disabled')+'>拋竿</button>':'<button class="btn'+(fish.st==='bite'?' alt':' ghost')+'" data-act="pull">拉竿</button>')+'</div>';
+      h+='<div class="row"><div class="info"><strong>水很清，看得到魚影</strong><small>'+(fish.msg||'拋竿後等 4 秒到 2 分鐘，浮標一沉就拉')+'</small></div><button class="btn" data-act="cast"'+(en>0?'':' disabled')+'>拋竿</button></div>';
       h+='<div class="seg">'+[['','不用餌'],['b','魚餌 ×'+S.bait.b],['f','高級魚餌 ×'+S.bait.f]].map(function(b){ return '<button type="button" class="'+((fish.bait||'')===b[0]?'on':'')+'" data-act="baitsel" data-id="'+b[0]+'">'+b[1]+'</button>'; }).join('')+'</div>';
       h+='<div class="note">現在釣得到：'+fpool.map(function(f){ return '<span style="color:'+RAR[IMAP[f.id].rar].c+'">'+(S.fishRec[f.id]?IMAP[f.id].name:'？？？')+'</span>'; }).join('、')+'</div>';
-      h+='<div class="row"><div class="info"><small>體力每 8 分鐘回 1 點。魚餌在工坊用作物做，用餌才釣得到特殊的魚，高級魚餌讓稀有魚機率加倍。魚類圖鑑在圖鑑館。</small></div></div>';
+      h+='<div class="row"><div class="info"><small>體力每 8 分鐘回 1 點。拉起來有一半機率是空竿。用魚餌等得比較短、才釣得到特殊的魚；高級魚餌讓稀有魚機率加倍。</small></div></div>';
     } else {
       sub='綠地';
       h+='<div class="row"><div class="info"><strong>公共綠地，不能買賣</strong></div></div>';
@@ -1376,9 +1456,9 @@ function refreshPanel(){
   } else if(tab==='pets'){
     title='寵物'; sub='養了 '+Object.keys(S.pets).length+' / '+PETS.length+' 隻';
     if(!PMAP[petSel]) petSel=(PETS.filter(function(x){return S.pets[x.id];})[0]||PETS[0]).id;
-    var pt=PMAP[petSel], own=S.pets[pt.id], hs=hearts(pt.id), plv=petLv(pt.id), fedN=own?petFed(pt.id,now):0, rq=petReq(pt), cd=own?30-(now-own.last)/1000:0, tl=own&&own.trip?(own.trip.until-now)/1000:0;
+    var pt=PMAP[petSel], own=S.pets[pt.id], hs=hearts(pt.id), plv=petLv(pt.id), fedN=own?petFed(pt.id,now):0, rq=petReq(pt), cd=own?21600-(now-own.last)/1000:0, tl=own&&own.trip?(own.trip.until-now)/1000:0;
     var petBtn=own?(own.trip?'<button class="btn alt" data-act="tripback" data-id="'+pt.id+'"'+(tl>0?' disabled':'')+'>'+(tl>0?'探險中':'領取')+'</button>'
-        :'<button class="btn" data-act="pet" data-id="'+pt.id+'"'+(cd>0?' disabled':'')+'>'+(cd>0?Math.ceil(cd)+' 秒':'摸摸')+'</button>')
+        :'<button class="btn" data-act="pet" data-id="'+pt.id+'"'+(cd>0?' disabled':'')+'>'+(cd>0?fmt(cd).replace(/ \d+ 秒$/,'')+'後':'摸摸')+'</button>')
       :(pt.cost.trip?'':'<button class="btn alt" data-act="adopt" data-id="'+pt.id+'"'+(rq.ok?'':' disabled')+'>'+rq.txt+'</button>');
     var stat=own?['<div><em>效果</em>'+pt.label+' +'+Math.round(pt.base*petMul(pt.id)*100)+'%'+(own.trip?'（外出中無效）':'')+'</div>',
         '<div><em>親密</em><span class="hearts">'+'♥♥♥♥♥'.slice(0,hs)+'♡♡♡♡♡'.slice(0,5-hs)+'</span>'+(hs<5?'　再摸 '+(4-own.aff%4)+' 次':'')+'</div>',
@@ -1398,7 +1478,7 @@ function refreshPanel(){
     h+='<div class="petact">'+(own&&!own.trip?TRIPS.map(function(tr,ti){ return '<button class="btn ghost sm" data-act="trip" data-id="'+pt.id+':'+ti+'">探險 '+tr.n+'</button>'; }).join(''):'')+'</div>';
     if(petZoom) h+='<div class="pzoom" data-act="petzoomx"><div class="pzbox"><div class="pname">'+pt.name+'<span style="color:'+RAR[pt.rar].c+'">'+RAR[pt.rar].n+'</span></div><div class="petview"><canvas id="petbig" width="64" height="36"></canvas></div><div class="stats">'+stat+'</div><div class="petact">'+petBtn+'<button class="btn ghost" data-act="petzoomx">關閉</button></div></div></div>';
   } else if(tab==='market'){
-    title='市場'; sub=mkTab==='sell'?'行情 '+Math.ceil(60-(now/1000)%60)+' 秒後變動':'玩家之間買賣，手續費 5%';
+    title='市場'; sub=mkTab==='sell'?'行情 '+fmt(10800-(WT(now)/1000)%10800)+'後變動':'玩家之間買賣，手續費 5%';
     h+='<div class="seg">'+[['sell','賣給市場'],['stalls','逛攤位'+(STALL.others.length?' '+STALL.others.length:'')],['mine','我的攤位 '+STALL.mine.length+'/6']].map(function(b){ return '<button type="button" class="'+(mkTab===b[0]?'on':'')+'" data-act="mktab" data-id="'+b[0]+'">'+b[1]+'</button>'; }).join('')+'</div>';
     var total=0;
     if(mkTab!=='sell'){
@@ -1554,7 +1634,7 @@ function refreshPanel(){
       '<div class="row"><div class="info"><small>音效音量</small><input class="rng" id="set_svol" type="range" min="0" max="100" value="'+Math.round(SET.svol*100)+'"></div></div>'+
       '<div class="sec">畫面</div>'+tg('fx','天氣特效','下雨、起霧、熱浪、彩虹的畫面效果')+tg('labels','小鎮地名','在小鎮地圖上顯示建築和朋友農場的名字')+'<div class="sec">通知</div><div class="row"><div class="info"><strong>推播通知</strong><small>作物成熟、有人偷菜、收到禮物時通知你。iPhone 要先把遊戲「加入主畫面」，從主畫面打開才能開。</small>'+(PUSHMSG?'<small class="down">'+esc(PUSHMSG)+'</small>':'')+'</div><button class="btn'+(PUSH_ON?'':' ghost')+'" data-act="push">'+(PUSH_ON?'開':'關')+'</button></div>'+
       '<div class="sec">進度</div><div class="row"><div class="info"><strong>重新開始</strong><small>'+'帳號進度會清空（雲端也會覆蓋），買的小鎮土地會釋出，農場位置不變。'+'</small></div><button class="btn ghost" data-act="reset">'+(resetArm?'再按一次確定':'重新開始')+'</button></div>'+
-      '<div class="row"><div class="info"><small>懶草農場 v1.1</small></div></div>';
+      '<div class="row"><div class="info"><small>懶草農場 v1.2</small></div></div>';
   } else if(tab==='ach'){
     var done=ACH.filter(function(a){return S.ach[a.id];}).length;
     title='任務與成就'; sub='成就 '+done+' / '+ACH.length;
@@ -1691,7 +1771,7 @@ $('plist').addEventListener('click',function(e){
   else if(act==='petzoomx'){ petZoom=false; }
   else if(act==='pet'){
     var o=S.pets[id];
-    if(o&&now-o.last>=30000){ var before=hearts(id); o.aff++; o.last=now; petFx=now; toast(hearts(id)>before?'「'+PMAP[id].name+'」更喜歡你了，加成提高':'「'+PMAP[id].name+'」很開心'); }
+    if(o&&now-o.last>=21600000){ var before=hearts(id); o.aff++; o.last=now; petFx=now; toast(hearts(id)>before?'「'+PMAP[id].name+'」更喜歡你了，加成提高':'「'+PMAP[id].name+'」很開心'); }
   }
   else if(act==='labpick'){
     var pk=labStack(id);
@@ -1776,27 +1856,7 @@ $('plist').addEventListener('click',function(e){
       o3.t=now;
     }
   }
-  else if(act==='cast'){
-    if(fishEn(now)<1){ sfx('err'); toast('釣魚體力用完了，'+fmt((FISH_EN.regen-(now-S.fishing.t))/1000)+'後回 1 點'); }
-    else {
-      fishReset(); S.fishing.en--; if(S.fishing.en===FISH_EN.max-1) S.fishing.t=now;
-      fish.bl=baitLv(); if(fish.bl===2) S.bait.f--; else if(fish.bl===1) S.bait.b--;
-      fish.st='wait';
-      fish.t1=setTimeout(function(){ fish.st='bite'; refreshPanel(); fish.t2=setTimeout(function(){ if(fish.st==='bite'){ fish.st='idle'; fish.msg='太慢了，魚跑掉了。'; refreshPanel(); } },1200); },(fish.bl?1000:1500)+Math.random()*(fish.bl?2500:3500));
-    }
-  }
-  else if(act==='pull'){
-    if(fish.st==='bite'){
-      var bl=fish.bl, pool=FISH.filter(function(f){ return fishOk(f,now,bl); }), tw=0, fr, fc=pool[0];
-      pool.forEach(function(f){ f._w=f.w*(bl===2&&IMAP[f.id].rar>=3?2:1); tw+=f._w; });
-      fr=Math.random()*tw; for(var fi=0;fi<pool.length;fi++){ fc=pool[fi]; if(fr<fc._w) break; fr-=fc._w; }
-      var cm=Math.round(fc.size[0]+(fc.size[1]-fc.size[0])*Math.pow(Math.random(),2)), rec=S.fishRec[fc.id]||(S.fishRec[fc.id]={n:0,max:0}), isNew=!rec.n, big=cm>rec.max;
-      rec.n++; if(big) rec.max=cm;
-      fishReset(); give(fc.id); S.stats.fish++; sfx('harvest',IMAP[fc.id].rar);
-      fish.msg='釣到「'+IMAP[fc.id].name+'」'+cm+' 公分（'+RAR[IMAP[fc.id].rar].n+'）'+(isNew?'，第一次釣到！':(big?'，新紀錄！':''));
-      if(isNew||IMAP[fc.id].rar>=3) logAdd('釣到「'+IMAP[fc.id].name+'」'+cm+' 公分');
-    } else { fishReset(); fish.msg='太早了，魚被嚇跑了。'; }
-  }
+  else if(act==='cast'){ fishCast(); }
   else if(act==='baitsel'){ fish.bait=id; }
   else if(act==='bait'){
     fixLab(); var BA=labStack(labA);
@@ -1970,10 +2030,10 @@ function welcome(away){
   if(S.tasks.length) lines.push('公告欄上有 '+S.tasks.length+' 個限時任務。');
   if(lines.length>1) modal('star','歡迎回來',lines,[['開工']]);
 }
-var nextEvent=Date.now()+2400000+Math.random()*1200000;
 function maybeEvent(now){
-  if(modalOpen||tab||gateOn()||scene==='visit'||now<nextEvent) return;
-  nextEvent=now+4800000+Math.random()*4200000;
+  if(!S.nextEvent) S.nextEvent=now+2400000+Math.random()*1200000;
+  if(modalOpen||tab||gateOn()||scene==='visit'||fish.view||pickI>=0||now<S.nextEvent) return;
+  S.nextEvent=now+4800000+Math.random()*4200000;
   var pool=['cat','cat','cat','cat','cat','granny','granny','granny','granny','merchant','merchant','merchant'];
   if(planted().length){ pool.push('police','police','police','police','police','ufo','ufo','ufo'); }
   EVENTS[pick(pool)]();
@@ -2046,7 +2106,7 @@ function resize(){
 }
 window.addEventListener('resize',function(){ resize(); updateLabels(); }); resize();
 var lastDraw=0;
-function frame(t){ if(t-lastDraw>(scene==='town'?15:60)){ if(scene==='town') townStep(Math.min(0.2,(t-lastDraw)/1000)); lastDraw=t; draw(t); drawPetBig(t); } requestAnimationFrame(frame); }
+function frame(t){ if(t-lastDraw>(scene==='town'||fish.view?15:60)){ if(scene==='town') townStep(Math.min(0.2,(t-lastDraw)/1000)); lastDraw=t; draw(t); drawPetBig(t); drawFishView(t); } requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 var ticks=0, lastWx='';
 function tick(){

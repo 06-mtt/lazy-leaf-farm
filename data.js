@@ -60,7 +60,6 @@ var GOODS={juice:{name:'綜合果汁',desc:'兩種作物榨的，價格固定，
 var PLOT_COST=[0,0,0,50,150,400,1000,2500,6000];
 var UPG={
   fert:{name:'有機肥料',desc:'成長速度 +25%',max:3,cost:[120,500,2000]},
-  sprinkler:{name:'自動灑水器',desc:'再也不用手動澆水',max:1,cost:[800]},
   speaker:{name:'Lofi 音響',desc:'植物聽了心情好，售價 +10%',max:3,cost:[200,900,3500]}
 };
 var RAR=[{n:'普通',c:'#8d8a99'},{n:'一般',c:'#f4f1ea'},{n:'精良',c:'#5aa0f2'},{n:'稀有',c:'#b06cf0'},{n:'傳說',c:'#f5c451'},{n:'神話',c:'#ef4a4a'}];
