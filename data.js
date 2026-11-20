@@ -79,8 +79,42 @@ var DECOR=[
   {id:'scarecrow',name:'稻草人',  cost:2500, charm:3,desc:'戴著你的舊草帽'},
   {id:'lantern',  name:'石燈籠',  cost:4000, charm:3,desc:'很有禪意'},
   {id:'windmill', name:'風車',    cost:9000, charm:5,desc:'葉片會慢慢轉'},
-  {id:'goldroof', name:'金色屋頂',cost:25000,charm:8,desc:'把小屋的屋頂換成金色'}
+  {id:'goldroof', name:'金色屋頂',cost:25000,charm:8,desc:'把小屋的屋頂換成金色'},
+  {id:'trophy',   name:'冠軍獎盃',cost:0,    charm:6,desc:'品評會的榮耀',rep:1}
 ];
 /* 角色外觀 */
-var HATS=[{id:'straw',name:'草帽',cost:0,c:'#e8c36a'},{id:'none',name:'不戴帽子',cost:0,c:'#6b4a3a'},{id:'cap',name:'紅色棒球帽',cost:400,c:'#d9505a'},{id:'beanie',name:'藍色毛帽',cost:800,c:'#5aa0f2'},{id:'crown',name:'金皇冠',cost:20000,c:'#f5c451'}];
+var HATS=[{id:'straw',name:'草帽',cost:0,c:'#e8c36a'},{id:'none',name:'不戴帽子',cost:0,c:'#6b4a3a'},{id:'cap',name:'紅色棒球帽',cost:400,c:'#d9505a'},{id:'beanie',name:'藍色毛帽',cost:800,c:'#5aa0f2'},{id:'crown',name:'金皇冠',cost:20000,c:'#f5c451'},{id:'wizard',name:'巫師帽',cost:0,c:'#7a4fd0',rep:1}];
 var SHIRTS=[{id:'red',name:'磚紅上衣',cost:0,c:'#d9705a'},{id:'green',name:'草綠上衣',cost:300,c:'#6fbf5f'},{id:'blue',name:'海藍上衣',cost:300,c:'#5aa0f2'},{id:'purple',name:'葡萄紫上衣',cost:600,c:'#b06cf0'},{id:'black',name:'黑色帽 T',cost:1200,c:'#35284f'},{id:'gold',name:'金色外套',cost:15000,c:'#f5c451'}];
+/* 品評會：每週一個指定品種，交出一株比品質。名次獎勵依序是第 1、2、3 名和參加獎 */
+var CONTEST_REWARD=[{rep:30,coins:1500},{rep:18,coins:800},{rep:10,coins:400},{rep:4,coins:100}];
+/* 聲望商店：只能用聲望換，金幣買不到 */
+var REPSHOP=[
+  {id:'charm', name:'幸運符 ×5',      cost:10,desc:'接下來 5 次收成品質運氣大增'},
+  {id:'seed1', name:'第一代配種種子', cost:15,desc:'隨機一種第一代品種的種子'},
+  {id:'seed2', name:'第二代配種種子', cost:60,desc:'隨機一種第二代品種的種子'},
+  {id:'wizard',name:'巫師帽',         cost:50,desc:'服飾店買不到的帽子',once:1},
+  {id:'trophy',name:'冠軍獎盃',       cost:80,desc:'擺在農場上，魅力 +6',once:1}
+];
+/* 居民故事：同一位居民每交貨 3 次解鎖一段，到他家聽。hint 是配方線索（填配種結果的 id） */
+var STORIES={
+  '隔壁阿嬤':[
+    {t:'「少年欸，阿嬤跟你說，懶懶綠跟紫雲朵種在一起，以前會長出涼涼的那種。」',hint:'mint',rep:5},
+    {t:'「懶懶綠自己跟自己配，十次有一次會多一片葉子，阿嬤年輕時看過。」',hint:'clover',rep:8},
+    {t:'「我那個黃金的，要配宇宙奶昔，晚上才會發光。那是你阿公最愛的。」',hint:'moon',item:'pickle',n:3,rep:12}],
+  '警察杯杯':[
+    {t:'「上次那個九層塔…咳。我是說，懶懶綠配檸檬電波，我老家也有人這樣種。」',hint:'lime',rep:5},
+    {t:'「巡邏時看過有人把青檸懶骨頭跟葡萄汽水放一起，那天風特別大。」',hint:'typhoon',rep:8},
+    {t:'「這個哨子你留著，我有新的了。以後巡邏我會多幫你看著田。」',item:'whistle',n:2,rep:12}],
+  '早餐店老闆':[
+    {t:'「紫雲朵加檸檬電波，打成汁會冒泡，我本來想放進菜單。」',hint:'grape',rep:5},
+    {t:'「薄荷晚霞配葡萄汽水，顏色會一層一層的，小朋友最愛。」',hint:'rainbow',rep:8},
+    {t:'「你種的東西我信得過。以後有好料記得先留給我。」',charm:3,rep:12}],
+  '廟口里長':[
+    {t:'「檸檬電波跟宇宙奶昔配在一起，會看到極光。土地公託夢說的。」',hint:'aurora',rep:5},
+    {t:'「極光雪酪配月光金沙，那個叫銀河。我只聽過，沒看過。」',hint:'galaxy',rep:8},
+    {t:'「這張符給你，保平安，也保收成。」',charm:5,rep:12}],
+  '外星觀光客':[
+    {t:'「你們星球的隕石，在我們那邊是伴手禮。送你一顆。」',item:'meteor',n:1,rep:5},
+    {t:'「母星有個傳說：彩虹糖霜遇上銀河鑽石，會生出不死的鳥。」',hint:'phoenix',rep:8},
+    {t:'「我要回去了，這個留給你。它在晚上長得特別好。」',seed:'aurora',n:2,rep:12}]
+};
