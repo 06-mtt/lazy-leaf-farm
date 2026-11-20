@@ -57,10 +57,18 @@ var SEASONS=['春','夏','秋','冬'];
 var SEASON_OF={lazy:0,clover:0,mint:0,lime:0,lemon:1,grape:1,typhoon:1,purple:2,gold:2,moon:2,rainbow:2,milk:3,aurora:3,galaxy:3,phoenix:3,friendleaf:0,twinstar:3,maple:2,snow:3,hongbao:0,cotton:3,bubble:1,honey:1,lavender:0,cocoa:3,dream:3,coral:1,eclipse:2,teatime:0,abyss:1,skygarden:0,cosmos:3};
 var TRIPS=[{n:'30 分',ms:1800000,rolls:1},{n:'2 小時',ms:7200000,rolls:3},{n:'8 小時',ms:28800000,rolls:8}];
 var GOODS={juice:{name:'綜合果汁',desc:'兩種作物榨的，價格固定，不受行情和飽和影響。'},jam:{name:'手工果醬',desc:'三株同品種熬的，價格固定，不受行情和飽和影響。'}};
-var PLOT_COST=[0,0,0,50,150,400,1000,2500,6000];
+var PLOT_COST=[0,0,0,300,1000,4000,15000,50000,150000];
+/* 配種的等級門檻：配出第幾代的品種需要幾級 */
+var BREED_LV={1:6,2:15,3:24,4:32};
 var UPG={
-  fert:{name:'有機肥料',desc:'成長速度 +25%',max:3,cost:[120,500,2000]},
-  speaker:{name:'Lofi 音響',desc:'植物聽了心情好，售價 +10%',max:3,cost:[200,900,3500]}
+  fert:{name:'有機肥料',desc:'成長速度 +25%',max:3,cost:[2000,30000,300000]},
+  speaker:{name:'Lofi 音響',desc:'植物聽了心情好，售價 +10%',max:3,cost:[3000,50000,500000]},
+  bucket:{name:'大水桶',desc:'澆一次水多撐 20%',max:3,cost:[5000,60000,400000]},
+  rod:{name:'碳纖釣竿',desc:'釣魚最長等待時間 -15%',max:3,cost:[8000,80000,500000]},
+  creel:{name:'大魚簍',desc:'釣魚體力上限 +5',max:3,cost:[6000,70000,450000]},
+  book:{name:'育種手冊',desc:'配種成功率 +3%',max:3,cost:[10000,120000,800000]},
+  jar:{name:'零食罐',desc:'每隻寵物每天多餵 1 次',max:2,cost:[50000,600000]},
+  scale:{name:'偷斤減兩的磅秤',desc:'賣太多時每個少跌 0.2%',max:2,cost:[40000,500000]}
 };
 var RAR=[{n:'普通',c:'#8d8a99'},{n:'一般',c:'#f4f1ea'},{n:'精良',c:'#5aa0f2'},{n:'稀有',c:'#b06cf0'},{n:'傳說',c:'#f5c451'},{n:'神話',c:'#ef4a4a'}];
 var SDESC={lazy:'長得快、不挑土，新手的好朋友。',purple:'聞起來像下雨前的雲。',lemon:'據說半夜會自己發光。',milk:'外星人最愛的口味。',gold:'阿嬤看了都說讚的傳家寶。',friendleaf:'兩個人一起種，才長得出來。',twinstar:'兩顆星星繞著彼此轉。',maple:'甜甜的，像秋天的早餐。',snow:'摸起來涼涼的，不會融化。',hongbao:'打開會掉出一枚金幣，不知道為什麼。',clover:'一千株裡才有一株的四片葉子。',mint:'涼涼的，像傍晚的風。',lime:'酸到會醒，但它自己很懶。',grape:'搖一搖會冒泡。',aurora:'在暗處會微微發光。',moon:'只在夜裡閃著金粉。',rainbow:'每一口顏色都不一樣。',typhoon:'靠近會聽到風聲。',galaxy:'裡面好像有星星在轉。',phoenix:'傳說枯掉了還會再長回來。'};
@@ -68,7 +76,17 @@ var ITEMS=[
   {id:'pickle',  name:'阿嬤的醃菜', rar:0, value:8,   desc:'阿嬤硬塞給你的，很下飯。'},
   {id:'hairball',name:'貓毛球',     rar:1, value:15,  desc:'摸貓的紀念品，意外地搶手。'},
   {id:'whistle', name:'警察的哨子', rar:2, value:120, desc:'警察杯杯走太急忘了帶走。'},
-  {id:'meteor',  name:'外星隕石',   rar:3, value:400, desc:'幽浮掉下來的，摸起來溫溫的。'}
+  {id:'meteor',  name:'外星隕石',   rar:3, value:400, desc:'幽浮掉下來的，摸起來溫溫的。'},
+  /* 釣魚空竿時偶爾勾到 */
+  {id:'slipper', name:'藍白拖',     rar:0, value:5},
+  {id:'shell',   name:'會罵人的貝殼',rar:1, value:40},
+  {id:'bottle',  name:'求救漂流瓶', rar:1, value:60},
+  {id:'denture', name:'阿伯的假牙', rar:3, value:1500},
+  /* 寵物探險帶回 */
+  {id:'pinecone',name:'松果',       rar:0, value:15},
+  {id:'feather', name:'鴿子的羽毛', rar:0, value:25},
+  {id:'oldcoin', name:'古錢幣',     rar:2, value:300},
+  {id:'glowrock',name:'會發光的石頭',rar:3, value:1200}
 ];
 var PETS=[
   {id:'chick',name:'小雞啾啾',  rar:0,base:0.20,label:'收成經驗',   cost:{coins:150},        pace:60, hop:1,faceRight:true},
@@ -98,28 +116,76 @@ var ACH=[
   {id:'task10',name:'使命必達',     desc:'完成 10 個限時任務',  reward:600, ok:function(s){return s.stats.tasks>=10;}},
   {id:'breed1',name:'育種新手',     desc:'配出第 1 個新品種',   reward:200, ok:function(s){return Object.keys(s.known||{}).length>=1;}},
   {id:'breedA',name:'育種大師',     desc:'發現全部 10 個新品種',reward:8000,ok:function(s){return Object.keys(s.known||{}).length>=10;}},
-  {id:'decorA',name:'室內設計師',   desc:'買齊全部農場裝飾',     reward:5000,ok:function(s){return Object.keys(s.decor||{}).length>=8;}},
+  {id:'decorA',name:'室內設計師',   desc:'擁有 20 樣農場裝飾',   reward:50000,ok:function(s){return Object.keys(s.decor||{}).length>=20;}},
   {id:'zoo2',  name:'萬獸之王',     desc:'收集全部 10 隻寵物',   reward:6000,ok:function(s){return Object.keys(s.pets||{}).length>=10;}},
   {id:'dexHalf',name:'圖鑑收藏家',   desc:'圖鑑完成一半',         reward:3000,ok:function(s){return Object.keys(s.dex||{}).length>=45;}}
 ];
 /* 農場裝飾：買了就會出現在農場上，每 1 點魅力讓市場售價 +1% */
 var DECOR=[
-  {id:'sign',     name:'木頭招牌',cost:300,  charm:1,desc:'寫著農場的名字'},
-  {id:'flowers',  name:'圍籬花圃',cost:600,  charm:1,desc:'圍籬下開滿小花'},
-  {id:'lamp',     name:'復古路燈',cost:1000, charm:2,desc:'整天亮著暖黃色的光'},
-  {id:'birdhouse',name:'鳥屋',    cost:1500, charm:2,desc:'偶爾有小鳥停在上面'},
-  {id:'scarecrow',name:'稻草人',  cost:2500, charm:3,desc:'戴著你的舊草帽'},
-  {id:'lantern',  name:'石燈籠',  cost:4000, charm:3,desc:'很有禪意'},
-  {id:'windmill', name:'風車',    cost:9000, charm:5,desc:'葉片會慢慢轉'},
-  {id:'goldroof', name:'金色屋頂',cost:25000,charm:8,desc:'把小屋的屋頂換成金色'},
-  {id:'trophy',   name:'冠軍獎盃',cost:0,    charm:6,desc:'品評會的榮耀',rep:1},
-  {id:'pumpkin',  name:'南瓜燈',  cost:800,  charm:2,desc:'秋收祭限定',ev:'autumn'},
-  {id:'xtree',    name:'聖誕樹',  cost:1500, charm:3,desc:'聖誕節限定',ev:'xmas'},
-  {id:'couplet',  name:'春聯',    cost:888,  charm:2,desc:'春節限定，貼在小屋門口',ev:'lny'}
+  {id:'sign',     name:'木頭招牌',cost:12000,  charm:1},
+  {id:'flowers',  name:'圍籬花圃',cost:24000,  charm:1},
+  {id:'lamp',     name:'復古路燈',cost:40000,  charm:2},
+  {id:'birdhouse',name:'鳥屋',    cost:60000,  charm:2},
+  {id:'scarecrow',name:'稻草人',  cost:100000, charm:3},
+  {id:'lantern',  name:'石燈籠',  cost:160000, charm:3},
+  {id:'windmill', name:'風車',    cost:360000, charm:5},
+  {id:'goldroof', name:'金色屋頂',cost:1000000,charm:8},
+  {id:'trophy',   name:'冠軍獎盃',cost:0,      charm:6,rep:1},
+  {id:'pumpkin',  name:'南瓜燈',  cost:32000,  charm:2,ev:'autumn'},
+  {id:'xtree',    name:'聖誕樹',  cost:60000,  charm:3,ev:'xmas'},
+  {id:'couplet',  name:'春聯',    cost:38888,  charm:2,ev:'lny'},
+  /* 以下是小擺飾（prop:1）：買了可以選要不要擺出來，圍籬邊的空位有限 */
+  {id:'cone',    name:'偷來的交通錐',  cost:8000,   charm:1,prop:1},
+  {id:'tire',    name:'輪胎花盆',      cost:10000,  charm:1,prop:1},
+  {id:'duck',    name:'巨大黃色小鴨',  cost:15000,  charm:1,prop:1},
+  {id:'cactus',  name:'會跳舞的仙人掌',cost:18000,  charm:1,prop:1},
+  {id:'barrel',  name:'醃菜木桶',      cost:22000,  charm:1,prop:1},
+  {id:'mailbox', name:'歪掉的信箱',    cost:28000,  charm:1,prop:1},
+  {id:'gnome',   name:'眼神怪怪的小矮人',cost:35000,charm:2,prop:1},
+  {id:'flamingo',name:'塑膠紅鶴',      cost:45000,  charm:2,prop:1},
+  {id:'mushroom',name:'巨大香菇',      cost:55000,  charm:2,prop:1},
+  {id:'tv',      name:'只有雜訊的電視',cost:70000,  charm:2,prop:1},
+  {id:'grill',   name:'中秋烤肉架',    cost:85000,  charm:2,prop:1},
+  {id:'bonsai',  name:'阿公的盆栽',    cost:100000, charm:3,prop:1},
+  {id:'snowman', name:'不會融化的雪人',cost:130000, charm:3,prop:1},
+  {id:'toilet',  name:'戶外馬桶',      cost:160000, charm:3,prop:1},
+  {id:'tent',    name:'露營帳篷',      cost:200000, charm:3,prop:1},
+  {id:'well',    name:'許願井',        cost:250000, charm:4,prop:1},
+  {id:'totem',   name:'圖騰柱',        cost:320000, charm:4,prop:1},
+  {id:'moai',    name:'摩艾石像',      cost:400000, charm:4,prop:1},
+  {id:'statue',  name:'阿嬤銅像',      cost:500000, charm:5,prop:1},
+  {id:'fountain',name:'尿尿小童噴泉',  cost:620000, charm:5,prop:1},
+  {id:'disco',   name:'迪斯可球',      cost:750000, charm:5,prop:1},
+  {id:'ufo2',    name:'墜毀的小飛碟',  cost:900000, charm:6,prop:1},
+  {id:'rocket',  name:'寶特瓶火箭',    cost:1100000,charm:6,prop:1},
+  {id:'goldwc',  name:'黃金馬桶',      cost:1500000,charm:8,prop:1}
 ];
+/* 裝飾的魅力加成上限（花園另外算，上限 30） */
+var CHARM_CAP=40;
 /* 角色外觀 */
-var HATS=[{id:'straw',name:'草帽',cost:0,c:'#e8c36a'},{id:'none',name:'不戴帽子',cost:0,c:'#6b4a3a'},{id:'cap',name:'紅色棒球帽',cost:400,c:'#d9505a'},{id:'beanie',name:'藍色毛帽',cost:800,c:'#5aa0f2'},{id:'crown',name:'金皇冠',cost:20000,c:'#f5c451'},{id:'wizard',name:'巫師帽',cost:0,c:'#7a4fd0',rep:1}];
-var SHIRTS=[{id:'red',name:'磚紅上衣',cost:0,c:'#d9705a'},{id:'green',name:'草綠上衣',cost:300,c:'#6fbf5f'},{id:'blue',name:'海藍上衣',cost:300,c:'#5aa0f2'},{id:'purple',name:'葡萄紫上衣',cost:600,c:'#b06cf0'},{id:'black',name:'黑色帽 T',cost:1200,c:'#35284f'},{id:'gold',name:'金色外套',cost:15000,c:'#f5c451'}];
+var HATS=[
+  {id:'straw',name:'草帽',cost:0,c:'#e8c36a'},{id:'none',name:'不戴帽子',cost:0,c:'#6b4a3a'},
+  {id:'cap',name:'紅色棒球帽',cost:16000,c:'#d9505a'},{id:'beanie',name:'藍色毛帽',cost:32000,c:'#5aa0f2'},
+  {id:'helmet',name:'工地安全帽',cost:45000,c:'#f5c451'},{id:'pot',name:'鍋子',cost:60000,c:'#9a8fb8'},
+  {id:'melon',name:'西瓜皮',cost:80000,c:'#3f8f4a'},{id:'chef',name:'廚師帽',cost:110000,c:'#f6e7c8'},
+  {id:'cowboy',name:'牛仔帽',cost:150000,c:'#8f6a4a'},{id:'mohawk',name:'雞冠頭',cost:200000,c:'#ef4a4a'},
+  {id:'bunny',name:'兔耳朵',cost:280000,c:'#f4f1ea'},{id:'antenna',name:'外星天線',cost:400000,c:'#9be08a'},
+  {id:'crown',name:'金皇冠',cost:800000,c:'#f5c451'},{id:'wizard',name:'巫師帽',cost:0,c:'#7a4fd0',rep:1}];
+var SHIRTS=[
+  {id:'red',name:'磚紅上衣',cost:0,c:'#d9705a'},{id:'green',name:'草綠上衣',cost:12000,c:'#6fbf5f'},
+  {id:'blue',name:'海藍上衣',cost:12000,c:'#5aa0f2'},{id:'purple',name:'葡萄紫上衣',cost:24000,c:'#b06cf0'},
+  {id:'tank',name:'阿伯吊嘎',cost:30000,c:'#f4f1ea'},{id:'pink',name:'粉紅 POLO 衫',cost:40000,c:'#ef9ab0'},
+  {id:'black',name:'黑色帽 T',cost:48000,c:'#35284f'},{id:'stripe',name:'囚犯條紋衫',cost:70000,c:'#f4f1ea',pat:'stripe',c2:'#2a2148'},
+  {id:'hawaii',name:'夏威夷衫',cost:100000,c:'#ee9a72',pat:'dots',c2:'#7fd8f0'},{id:'camo',name:'迷彩服',cost:140000,c:'#5c8c66',pat:'dots',c2:'#3a5a42'},
+  {id:'neon',name:'螢光背心',cost:190000,c:'#d8ff3c',pat:'stripe',c2:'#f6e7c8'},{id:'suit',name:'西裝',cost:300000,c:'#2a2148',pat:'tie',c2:'#ef4a4a'},
+  {id:'rainbow',name:'彩虹衫',cost:450000,c:'#ef4a4a',pat:'rainbow'},{id:'gold',name:'金色外套',cost:600000,c:'#f5c451'}];
+/* 配件：戴在身上的小東西 */
+var ACCS=[
+  {id:'none',name:'不戴配件',cost:0,c:'#463566'},
+  {id:'shades',name:'太陽眼鏡',cost:20000,c:'#2a2148'},{id:'mask',name:'口罩',cost:30000,c:'#cfe8e8'},
+  {id:'stache',name:'小鬍子',cost:50000,c:'#3a2433'},{id:'scarf',name:'紅圍巾',cost:80000,c:'#d9303a'},
+  {id:'chain',name:'大金鍊',cost:150000,c:'#f5c451'},{id:'pack',name:'登山背包',cost:220000,c:'#5aa0f2'},
+  {id:'phones',name:'耳罩耳機',cost:320000,c:'#ef7a8a'},{id:'cape',name:'英雄披風',cost:500000,c:'#b06cf0'}];
 /* 品評會：每週一個指定品種，交出一株比品質。名次獎勵依序是第 1、2、3 名和參加獎 */
 var CONTEST_REWARD=[{rep:30,coins:1500},{rep:18,coins:800},{rep:10,coins:400},{rep:4,coins:100}];
 /* 聲望商店：只能用聲望換，金幣買不到 */
@@ -194,7 +260,7 @@ ITEMS.push(
   {id:'fish13',name:'黃金鯉王',rar:4,value:3000}
 );
 /* 寵物成長：餵食累積經驗，達到門檻升一級（最高 5 級）。每隻每天最多餵 10 次 */
-var PET_LV=[30,90,200,400,800], PET_FEED_MAX=10, FEED_FISH=[3,6,12,25,60], FEED_CROP=[1,1,2,3,5,8];
+var PET_LV=[30,90,200,400,800], PET_FEED_MAX=5, FEED_FISH=[3,6,12,25,60], FEED_CROP=[1,1,2,3,5,8];
 ACH.push(
   {id:'land3', name:'包租公',   desc:'在小鎮買下 3 塊地',reward:2000,ok:function(s){return Object.keys(s.land||{}).length>=3;}},
   {id:'dragon',name:'釣魚高手', desc:'釣到一條龍魚',     reward:3000,ok:function(s){return (s.items||{}).fish5!==undefined;}},
