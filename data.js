@@ -137,3 +137,6 @@ ACH.push(
   {id:'land3', name:'包租公',   desc:'在小鎮買下 3 塊地',reward:2000,ok:function(s){return Object.keys(s.land||{}).length>=3;}},
   {id:'dragon',name:'釣魚高手', desc:'釣到一條龍魚',     reward:3000,ok:function(s){return (s.items||{}).fish5!==undefined;}}
 );
+/* 雲端：Supabase 專案的網址和公開金鑰。這把金鑰本來就是給網頁用的，可以公開；
+   資料靠資料庫裡的規則保護，每個人只能讀寫自己的存檔 */
+var CLOUD={url:'https://jsjjqieyizonghogafrl.supabase.co',key:'sb_publishable_ltN1Rso7c258EKLRZBtUEw_O_SYfwzu'};

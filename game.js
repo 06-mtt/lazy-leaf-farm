@@ -31,15 +31,19 @@ var PMAP={}; PETS.forEach(function(p){PMAP[p.id]=p;});
 
 
 /* ---------- 存檔層：之後換成雲端存檔只需要改這一段 ---------- */
-var SAVE_KEY='lazyleaf-save-v1';
+var GUEST_KEY='lazyleaf-save-v1', SAVE_KEY=GUEST_KEY;
 var Store={
   load:function(){ try{ var r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } },
   save:function(s){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(s)); }catch(e){} },
   clear:function(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
 };
+/* 設定：只存在這台裝置 */
+var SET={music:false,mvol:0.6,sfx:true,svol:0.7,fx:true,labels:true};
+try{ var _st=JSON.parse(localStorage.getItem('lazyleaf-settings')||'{}'); for(var _k in _st) if(_k in SET) SET[_k]=_st[_k]; }catch(e){}
+function saveSet(){ try{ localStorage.setItem('lazyleaf-settings',JSON.stringify(SET)); }catch(e){} }
 function fresh(){
   var plots=[]; for(var i=0;i<9;i++) plots.push({u:i<3,crop:null,prog:0,last:0,water:0});
-  return {v:1,coins:30,xp:0,lvl:1,seed:'lazy',plots:plots,inv:{},
+  return {v:1,coins:100,xp:0,lvl:1,seed:'lazy',plots:plots,inv:{},seeds:{lazy:10},
     upg:{fert:0,sprinkler:0,speaker:0,dog:0},
     stats:{harvest:0,earned:0,bluff:0,cat:0,ufo:0,gold:0},ach:{},items:{},pets:{}};
 }
@@ -154,9 +158,9 @@ function toast(msg){
 }
 function hud(){
   $('coins').textContent=S.coins.toLocaleString('en-US');
-  $('lvl').textContent='LV '+S.lvl;
+  $('lvl').innerHTML='LV '+S.lvl+(S.name?'<span class="nm">'+esc(S.name)+'</span>':'');
   $('xpfill').style.width=Math.min(100,S.xp/xpNeed(S.lvl)*100)+'%';
-  var s=SMAP[S.seed]; $('seedname').textContent=s.name+(s.gen?' ×'+(S.seeds[s.id]||0):' '+s.cost); $('seedsw').style.background=s.color;
+  var s=SMAP[S.seed]; $('seedname').textContent=s.name+((s.gen||S.seeds[s.id]>0)?' ×'+(S.seeds[s.id]||0):' '+s.cost); $('seedsw').style.background=s.color;
   document.querySelector('#tabs [data-tab=ach]').textContent=S.tasks.length?'任務 '+S.tasks.length:'任務';
   $('go').textContent=scene==='farm'?'去小鎮':'回農場';
   $('repl').textContent='金幣・聲望 '+S.rep;
@@ -290,7 +294,7 @@ function draw(t){
       else if(!wet&&Math.floor(t/400)%2){ px(r.x+37,r.y+3,1,1,'#7fd8f0'); px(r.x+36,r.y+4,3,1,'#7fd8f0'); px(r.x+35,r.y+5,5,3,'#7fd8f0'); px(r.x+36,r.y+8,3,1,'#7fd8f0'); px(r.x+36,r.y+6,1,1,'#eafaff'); }
     }
   }
-  var wv=weather(now).id;
+  var wv=SET.fx?weather(now).id:'none';
   if(wv==='rain'){ for(i=0;i<46;i++){ var rx=(i*41+Math.floor(t/30)*3)%W, ry=(i*67+Math.floor(t/30)*9)%H; px(rx,ry,1,3,'#9fd0f0'); } }
   else if(wv==='heat'){ ctx.fillStyle='rgba(255,170,90,.13)'; ctx.fillRect(0,0,W,H); for(i=0;i<5;i++) px(118+Math.round(Math.cos(i*1.3+t/900)*15),40+Math.round(Math.sin(i*1.3+t/900)*-9),2,2,'#ffd9a0'); }
   else if(wv==='fog'){ ctx.fillStyle='rgba(230,224,240,.22)'; for(i=0;i<5;i++) ctx.fillRect(((t/90+i*70)%260)-60,56+i*30,90,10); }
@@ -335,7 +339,7 @@ var NODES=[], EDGES=[];
 })();
 /* 有功能的地（大塊）。row 1 表示在馬路北側、門口朝南 */
 var FUNC=[
-  {id:'farm',  type:'farm', name:'你的農場',x:488,y:312,row:1},
+  {id:'post',  type:'shop', name:'郵局',    x:488,y:312,row:1,tab:'friends',roof:'#d9505a',ridge:'#f08a8a',icon:'mail'},
   {id:'seeds', type:'shop', name:'種子行',  x:521,y:312,row:1,tab:'seeds', roof:'#6f9a6a',ridge:'#8fbf8a',icon:'bud'},
   {id:'market',type:'shop', name:'市場',    x:554,y:312,row:1,tab:'market',roof:'#c98a5a',ridge:'#e0a878',icon:'star'},
   {id:'lab',   type:'shop', name:'工坊',    x:587,y:312,row:1,tab:'lab',   roof:'#7a6fa8',ridge:'#9a8fc8',icon:'juice'},
@@ -375,15 +379,16 @@ var LOTS=[], LOTMAP={};
     LOTS.push(l); LOTMAP[n]=l;
   }
 })();
-var FARMLOT=LOTS[0];
-var town={x:FARMLOT.door[0],y:FARMLOT.door[1],dir:1,pending:null,path:[],cx:0,cy:0,step:0};
+var HOMEPOOL=LOTS.filter(function(l){ return l.small&&l.type==='sale'&&l.sw===3&&l.sh===3&&l.price<=4000; });
+function homeLot(){ return LOTMAP[S.home]||HOMEPOOL[0]; }
+var town={x:homeLot().door[0],y:homeLot().door[1],dir:1,pending:null,path:[],cx:0,cy:0,step:0};
 var NPC=[{x:300,y:345,ax:'x',lo:30,hi:920,dir:1,sp:9,c:{hair:'#e6e0f0',skin:'#f2c9a0',shirt:'#b48cf2',pants:'#5e4a82'}},{x:483,y:200,ax:'y',lo:70,hi:630,dir:-1,sp:12,c:{hat:'#4a6fd0',skin:'#f2c9a0',shirt:'#4a6fd0',pants:'#2a2148'}}];
 var fish={st:'idle',msg:'',t1:0,t2:0};
 function fishReset(){ clearTimeout(fish.t1); clearTimeout(fish.t2); fish.st='idle'; fish.msg=''; }
 var ME={};
 function syncLook(){
   var h=HATS.filter(function(x){return x.id===S.look.hat;})[0]||HATS[0], sh=SHIRTS.filter(function(x){return x.id===S.look.shirt;})[0]||SHIRTS[0];
-  ME={hatType:h.id,hat:h.c,hair:'#6b4a3a',skin:'#f2c9a0',shirt:sh.c,pants:'#3d4a7a'};
+  ME={hatType:h.id,hat:h.c,hair:'#6b4a3a',skin:'#f2c9a0',shirt:sh.c,pants:'#3d4a7a',long:S.gender==='f'};
 }
 syncLook();
 BMP.lampi={rows:['.....yy.....','....yyyy....','....yyyy....','.....kk.....','.....kk.....','.....kk.....','....kkkk....'],pal:{y:'#ffd98a',k:'#b9a8cf'}};
@@ -402,6 +407,7 @@ function drawDecor(t){
   if(D.trophy){ px(128,47,5,3,'#b08a66'); px(128,40,5,4,'#f5c451'); px(130,44,1,3,'#f5c451'); px(127,41,1,2,'#f5c451'); px(133,41,1,2,'#f5c451'); px(129,41,1,1,'#fff6c8'); }
   if(D.flowers){ var fc=['#ef7a8a','#f5c451','#b48cf2','#f6e7c8']; for(k=4;k<W;k+=9){ px(k,57,1,2,'#6fbf5f'); px(k-1,56,3,1,fc[(k/9|0)%4]); px(k,55,1,1,fc[(k/9|0)%4]); } }
 }
+BMP.mail={rows:['............','.wwwwwwwwww.','.wkwwwwwwkw.','.wwkwwwwkww.','.wwwkwwkwww.','.wwwwkkwwww.','.wwwwwwwwww.','............'],pal:{w:'#f6e7c8',k:'#c8647a'}};
 BMP.bud={rows:BUD,pal:{c:'#8fd67a',d:'#5fa052',g:'#6fbf5f',w:'#ffffff',s:'#3f8f4a'}};
 BMP.deed={rows:['..wwwwwww...','..wkkkkkw...','..wwwwwww...','..wkkkkkw...','..wwwwwww...','..wkkkwww...','..wwwwwrw...','..wwwwwww...'],pal:{w:'#f6e7c8',k:'#5e4a82',r:'#c8647a'}};
 var LBL=LOTS.filter(function(l){return l.label;});
@@ -421,14 +427,29 @@ function person(fx,fy,step,dir,c){
   else { px(fx+1,fy-1,4,3,c.hair||c.hat); }
   px(fx+1,fy+2,4,3,c.skin); px(fx+(dir>0?4:1),fy+3,1,1,'#2a2148');
   px(fx,fy+5,6,5,c.shirt); px(fx+1,fy+10,2,3-step,c.pants); px(fx+3,fy+10,2,2+step,c.pants);
+  if(c.long){ px(fx,fy+1,1,7,c.hair||'#6b4a3a'); px(fx+5,fy+1,1,7,c.hair||'#6b4a3a'); }
+}
+function drawPerson(el,g){ var saved=ctx; ctx=el.getContext('2d'); ctx.clearRect(0,0,el.width,el.height); person(2,3,0,1,{hatType:'straw',hat:'#e8c36a',hair:'#6b4a3a',skin:'#f2c9a0',shirt:'#d9705a',pants:'#3d4a7a',long:g==='f'}); ctx=saved; }
+var AVC={};
+function avatar(g){ g=g==='f'?'f':'m'; if(!AVC[g]){ var el=document.createElement('canvas'); el.width=10; el.height=16; drawPerson(el,g); AVC[g]=el.toDataURL(); } return AVC[g]; }
+var dynEls=[];
+function dynLabel(i,text,x,y){
+  var el=dynEls[i]; if(!el){ el=document.createElement('div'); el.className='lbl'; $('labels').appendChild(el); dynEls[i]=el; }
+  if(el.textContent!==text) el.textContent=text; el.style.display='block'; el.style.left=x+'px'; el.style.top=y+'px';
 }
 function updateLabels(){
-  var sc=cv.clientWidth/W;
+  var sc=cv.clientWidth/W, di=0;
   LBL.forEach(function(l,i){
     var el=lblEls[i], x=l.x+15-town.cx, y=(l.row?l.y:l.y+28)-town.cy;
-    if(scene!=='town'||x<14||x>W-14||y<10||y>H-10){ el.style.display='none'; return; }
+    if(scene!=='town'||!SET.labels||x<14||x>W-14||y<10||y>H-10){ el.style.display='none'; return; }
     el.style.display='block'; el.style.left=(cv.offsetLeft+x*sc)+'px'; el.style.top=(cv.offsetTop+y*sc)+'px';
   });
+  if(scene==='town'){
+    var list=[], hl=LOTMAP[S.home]; if(hl) list.push([hl,'你的農場']);
+    if(SET.labels) Object.keys(WORLD.lots).forEach(function(k){ var o=WORLD.lots[k], p=WORLD.prof[o.owner], l=LOTMAP[k]; if(o.kind==='home'&&l&&p&&!(user&&o.owner===user.id)) list.push([l,p.name]); });
+    list.forEach(function(it){ var l=it[0], x=l.x+7-town.cx, y=l.y+14-town.cy; if(x<10||x>W-10||y<4||y>H-8) return; dynLabel(di++,it[1],cv.offsetLeft+x*sc,cv.offsetTop+y*sc); });
+  }
+  for(;di<dynEls.length;di++) dynEls[di].style.display='none';
 }
 function tree(x,y){ px(x+1,y,4,6,'#2f6b45'); px(x,y+1,6,4,'#2f6b45'); px(x+1,y+1,2,2,'#4f9a62'); }
 function outline(X,Y,w,h,c){ px(X,Y,w,1,c); px(X,Y+h-1,w,1,c); px(X,Y,1,h,c); px(X+w-1,Y,1,h,c); }
@@ -456,6 +477,17 @@ function drawBig(l,t,ox,oy){
     px(X+9,Y+18,2,6,'#b08a66'); px(X+19,Y+18,2,6,'#b08a66'); px(X+6,Y+9,18,11,'#b08a66'); px(X+7,Y+10,16,9,'#c9a27a'); px(X+8,Y+11,4,6,'#f6e7c8'); px(X+13,Y+11,4,4,'#f5c451'); px(X+18,Y+12,4,6,'#f6e7c8');
     if(S.tasks.length&&Math.floor(t/400)%2) px(X+22,Y+6,4,4,'#ef4a4a');
   }
+}
+function drawFarmSmall(l,ox,oy,mine,col,landOnly){
+  var X=l.x-ox, Y=l.y-oy, k;
+  px(X,Y,15,14,'#5c8c66');
+  if(landOnly){ px(X+3,Y+3,9,7,'#9a8fb8'); px(X+3,Y+3,9,1,'#c9bfd8'); px(X+6,Y+10,3,3,'#b08a66'); }
+  else for(k=0;k<9;k++){
+    var qx=X+1+(k%3)*5, qy=Y+1+Math.floor(k/3)*4;
+    if(mine){ var p=S.plots[k]; if(!p.u){ px(qx,qy,4,3,'#456a52'); continue; } px(qx,qy,4,3,'#7a5644'); if(p.crop){ var st=SMAP[p.crop]; px(qx+1,qy+1,2,1,p.prog>=st.time?st.color:'#6fbf5f'); } }
+    else { px(qx,qy,4,3,'#7a5644'); if((k+l.n)%3) px(qx+1,qy+1,2,1,'#6fbf5f'); }
+  }
+  outline(X,Y,15,14,col);
 }
 function drawSmall(l,ox,oy){
   var X=l.x-ox, Y=l.y-oy, ty=l.type, own=S.land[l.n];
@@ -505,20 +537,26 @@ function renderTownBg(){
   m.fillStyle='#35284f'; m.fillRect(0,0,48,35); m.fillStyle='#5aa0c8'; m.fillRect(35,20,6,3);
   m.strokeStyle='#8d7fb0'; m.lineWidth=1; ROADS.forEach(function(r){ m.beginPath(); m.moveTo(r[0]/20+0.5,r[1]/20+0.5); m.lineTo(r[2]/20+0.5,r[3]/20+0.5); m.stroke(); });
   m.fillStyle='#f5c451'; FUNC.forEach(function(f){ m.fillRect(Math.round(f.x/20),Math.round(f.y/20),2,1); });
-  m.fillStyle='#ef7a8a'; m.fillRect(Math.round(FARMLOT.x/20),Math.round(FARMLOT.y/20),2,2);
 }
 function drawTown(t){
   if(!townBg) renderTownBg();
   var cx=Math.round(town.cx), cy=Math.round(town.cy);
   ctx.drawImage(townBg,cx,cy,W,H,0,0,W,H);
   LOTS.forEach(function(l){ if(l.x-cx>W||l.y-cy>H||l.x+l.w-cx<0||l.y+l.h-cy<0) return;
-    if(l.type==='farm'||l.type==='board') drawBig(l,t,cx,cy); else if(l.small&&S.land[l.n]) drawSmall(l,cx,cy); });
+    if(l.type==='board') drawBig(l,t,cx,cy);
+    else if(l.small){
+      if(l.n===S.home) drawFarmSmall(l,cx,cy,true,Math.floor(t/500)%2?'#f5c451':'#ef7a8a');
+      else if(S.land[l.n]) drawSmall(l,cx,cy);
+      else { var o=WORLD.lots[l.n]; if(o) drawFarmSmall(l,cx,cy,false,isFriend(o.owner)?'#5aa0f2':'#f6e7c8',o.kind!=='home'); }
+    } });
   var catx=((t/140)%(TW+60))-30; bmp(ctx,BMP.cat,Math.round(catx)-cx,CY+1-cy,false);
   NPC.forEach(function(n,k){ person(Math.round(n.x)-3-cx,Math.round(n.y)-10-cy,Math.floor(t/260+k)%2,n.dir,n.c); });
   person(Math.round(town.x)-3-cx,Math.round(town.y)-10-cy,town.path.length?Math.floor(town.step)%2:0,town.dir,ME);
   var mx=W-52, my=H-39;
   ctx.drawImage(miniBg,mx,my); outline(mx-1,my-1,50,37,'#5e4a82');
   Object.keys(S.land).forEach(function(k){ var l=LOTMAP[k]; if(l) px(mx+Math.round(l.x/20),my+Math.round(l.y/20),1,1,'#8fd67a'); });
+  FR.mine.forEach(function(id){ var l=LOTMAP[WORLD.home[id]]; if(l) px(mx+Math.round(l.x/20),my+Math.round(l.y/20),2,2,'#5aa0f2'); });
+  var hl=LOTMAP[S.home]; if(hl) px(mx+Math.round(hl.x/20),my+Math.round(hl.y/20),2,2,'#ef7a8a');
   outline(mx+Math.round(cx/20),my+Math.round(cy/20),8,10,'#f6e7c8');
   if(Math.floor(t/300)%2) px(mx+Math.round(town.x/20)-1,my+Math.round(town.y/20)-1,2,2,'#ffffff');
   updateLabels();
@@ -527,7 +565,7 @@ function townStep(dt){
   if(town.path.length){
     var T=town.path[0], dx=T[0]-town.x, dy=T[1]-town.y, d=Math.sqrt(dx*dx+dy*dy);
     if(d<1){ town.x=T[0]; town.y=T[1]; town.path.shift(); if(!town.path.length&&town.pending){ var l=town.pending; town.pending=null; enterLot(l); } }
-    else { var mv=Math.min(d,95*dt); town.x+=dx/d*mv; town.y+=dy/d*mv; if(Math.abs(dx)>0.5) town.dir=dx>0?1:-1; town.step+=dt*8; }
+    else { var mv=Math.min(d,(town.path.length>2?150:95)*dt); town.x+=dx/d*mv; town.y+=dy/d*mv; if(Math.abs(dx)>0.5) town.dir=dx>0?1:-1; town.step+=dt*8; }
   }
   NPC.forEach(function(n){ n[n.ax]+=n.dir*n.sp*dt; if(n[n.ax]<n.lo) n.dir=1; if(n[n.ax]>n.hi) n.dir=-1; });
   town.cx=clamp(town.x-80,0,TW-W); town.cy=clamp(town.y-100,0,TH-H);
@@ -557,13 +595,13 @@ function townClick(x,y){
   town.pending=null; routeTo(nearestRoad(wx,wy).pt);
 }
 function enterLot(l){
-  if(l.type==='farm') setScene('farm');
+  if(l.n===S.home) setScene('farm');
   else if(l.tab) showTab(l.tab);
   else { curLot=l; fishReset(); showTab('lot'); }
 }
 function setScene(sc){
   scene=sc; if(tab) closePanel();
-  if(sc==='town'){ town.x=FARMLOT.door[0]; town.y=FARMLOT.door[1]; town.path=[]; town.pending=null; townStep(0); if(!S.townSeen) toast('點一塊地會走過去，再進入或查看；點馬路可以散步'); S.townSeen=1; }
+  if(sc==='town'){ loadWorld(); var hl=homeLot(); town.x=hl.door[0]; town.y=hl.door[1]; town.path=[]; town.pending=null; townStep(0); if(!S.townSeen) toast('點一塊地會走過去，再進入或查看；點馬路可以散步'); S.townSeen=1; }
   $('stage').style.background=sc==='town'?'#4d7a5a':'';
   updateLabels(); hud();
 }
@@ -581,13 +619,15 @@ cv.addEventListener('click',function(e){
       toast('到小鎮的「地政所」買地'+(i===first?'，這塊要 '+PLOT_COST[i]+' 金幣':'')); return;
     } else if(!p.crop){
       var s=SMAP[S.seed];
-      if(s.gen){ if(!(S.seeds[s.id]>0)){ toast('「'+s.name+'」種子用完了，到工坊配種'); return; } S.seeds[s.id]--; }
-      else if(S.coins<s.cost){ toast('金幣不夠買「'+s.name+'」種子（'+s.cost+'）'); return; }
-      S.coins-=s.cost; p.crop=s.id; p.prog=0; p.last=now; p.dry=0; p.water=S.upg.sprinkler?now+1e9:0;
+      if(s.gen){ if(!(S.seeds[s.id]>0)){ sfx('err'); toast('「'+s.name+'」種子用完了，到工坊配種'); return; } S.seeds[s.id]--; }
+      else if(S.seeds[s.id]>0){ S.seeds[s.id]--; }
+      else if(S.coins<s.cost){ sfx('err'); toast('金幣不夠買「'+s.name+'」種子（'+s.cost+'）'); return; }
+      else S.coins-=s.cost;
+      p.crop=s.id; p.prog=0; p.last=now; p.dry=0; p.water=S.upg.sprinkler?now+1e9:0;
       if(p.prev===s.id){ p.streak=(p.streak||0)+1; p.rot=Math.max(-0.3,-0.08*p.streak*(has(s,'heirloom')?2:1)); }
       else { p.streak=0; p.rot=p.prev?0.1:0; }
       p.prev=s.id;
-      burst(r.x+22,r.y+30,'#7a5644');
+      burst(r.x+22,r.y+30,'#7a5644'); sfx('plant');
       toast(p.rot>0?'換種新的，輪作讓品質運氣提高':(p.rot<0?'這塊地連種同一種，品質運氣下降':(S.upg.sprinkler?'種下去了':'種下去了，再點一下澆水')));
     } else {
       grow(p,now);
@@ -601,9 +641,9 @@ cv.addEventListener('click',function(e){
         var kept=st.gen&&Math.random()<0.6+0.05*q; if(kept) S.seeds[st.id]=(S.seeds[st.id]||0)+1;
         addXp(Math.ceil(st.time/10*(1+petBonus('chick'))*(1+0.2*q))); p.crop=null; p.prog=0;
         if(has(st,'spark')) neighbors(i).forEach(function(k){ var o=S.plots[k]; if(o.crop&&!isRipe(o)){ o.prog+=SMAP[o.crop].time*0.15; var rr=plotRect(k); burst(rr.x+22,rr.y+20,'#f2e35c'); } });
-        burst(r.x+22,r.y+12,RAR[q].c); toast('收成「'+st.name+'」，品質：'+RAR[q].n+(q>=4?'！':'')+(kept?'，還留下一顆種子':'')+(S.townSeen?'':'。按「去小鎮」可以到市場賣'));
+        burst(r.x+22,r.y+12,RAR[q].c); sfx('harvest',q); toast('收成「'+st.name+'」，品質：'+RAR[q].n+(q>=4?'！':'')+(kept?'，還留下一顆種子':'')+(S.townSeen?'':'。按「去小鎮」可以到市場賣'));
       } else if(now>=p.water){
-        p.water=now+waterSpan(st)*(weather(now).id==='heat'?0.6:1); burst(r.x+22,r.y+24,'#7fd8f0');
+        p.water=now+waterSpan(st)*(weather(now).id==='heat'?0.6:1); burst(r.x+22,r.y+24,'#7fd8f0'); sfx('water');
       } else {
         toast('「'+st.name+'」還要 '+fmt((st.time-p.prog)/speed()));
       }
@@ -614,11 +654,251 @@ cv.addEventListener('click',function(e){
 
 /* ---------- 面板 ---------- */
 var tab=null;
+var TABGRP={acct:'upg',friends:'upg',settings:'upg'};
 function openTab(t){
-  tab=(tab===t)?null:t;
+  var prev=tab; tab=(tab===t)?null:t;
   $('panel').classList.toggle('open',!!tab);
-  Array.prototype.forEach.call(document.querySelectorAll('#tabs button[data-tab]'),function(b){ b.classList.toggle('on',b.dataset.tab===tab); });
+  var g=TABGRP[tab]||tab;
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button[data-tab]'),function(b){ b.classList.toggle('on',b.dataset.tab===g); });
+  if(tab&&tab!==prev){ $('plist').scrollTop=0; sfx('open'); if(tab==='friends'){ loadFriends(); loadWorld(); } }
   refreshPanel();
+}
+/* ---------- 帳號、登入畫面、雲端存檔、其他玩家、好友 ---------- */
+var sb=null, user=null, cloudMsg='', authMsg='', lastCloud=0, cloudBusy=false, authBusy=false;
+try{ if(window.supabase&&CLOUD&&CLOUD.url) sb=window.supabase.createClient(CLOUD.url,CLOUD.key); }catch(e){ sb=null; }
+function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+function authErr(m){
+  m=String(m||'');
+  if(/Invalid login/i.test(m)) return '信箱或密碼不對';
+  if(/not confirmed/i.test(m)) return '信箱還沒確認，請先點確認信裡的連結';
+  if(/already registered|already been registered/i.test(m)) return '這個信箱已經註冊過，直接登入就好';
+  if(/at least 6|should be at least/i.test(m)) return '密碼至少要 6 個字元';
+  if(/rate limit|too many|security purposes/i.test(m)) return '操作太頻繁，請等一下再試';
+  if(/valid email|invalid format|invalid.*email/i.test(m)) return '信箱格式不對';
+  if(/fetch|network|load failed/i.test(m)) return '連不到伺服器，檢查一下網路';
+  return '發生錯誤：'+m;
+}
+function validSave(d){ return !!(d&&d.v===1&&d.plots&&d.plots.length===9); }
+function newPlayer(home){ var n=fresh(); n.home=home; return n; }
+function ensureHome(){ if(!S.home||!LOTMAP[S.home]) S.home=HOMEPOOL[Math.floor(Math.random()*HOMEPOOL.length)].n; }
+
+/* 登入畫面：login 登入／註冊、setup 取名與性別、loading 讀取中 */
+var gate={step:'none',gender:'',preName:'',pending:null};
+function gateOn(){ return gate.step!=='none'; }
+function gmsg(t,bad){ var el=$('gmsg'); if(el){ el.textContent=t||''; el.className='gmsg'+(bad?' down':''); } }
+function gateShow(step,msg,bad){
+  gate.step=step; $('gate').style.display='flex';
+  var b='';
+  if(step==='login'){
+    if(sb) b='<input class="inp" id="g_email" type="email" autocomplete="email" placeholder="電子信箱">'+
+      '<input class="inp" id="g_pass" type="password" autocomplete="current-password" placeholder="密碼（至少 6 個字元）">'+
+      '<div class="grow"><button type="button" class="btn" data-g="signin">登入</button><button type="button" class="btn alt" data-g="signup">註冊</button></div>';
+    b+='<p id="gmsg" class="gmsg"></p><button type="button" class="glink" data-g="guest">先試玩，不登入（進度只存在這台裝置）</button>';
+    if(!sb&&!msg){ msg='連不到伺服器，現在只能試玩。'; }
+  } else if(step==='setup'){
+    b='<p class="gmsg" style="color:var(--cream)">幫你的角色取名字、選性別</p>'+
+      '<input class="inp" id="g_name" type="text" maxlength="12" placeholder="角色名稱（2 到 12 個字）">'+
+      '<div class="gpick"><button type="button" class="gchoice" data-g="m"><canvas id="gp_m" width="10" height="16"></canvas><span>男生</span></button>'+
+      '<button type="button" class="gchoice" data-g="f"><canvas id="gp_f" width="10" height="16"></canvas><span>女生</span></button></div>'+
+      '<p id="gmsg" class="gmsg">名字之後朋友會看到，也是加好友用的。</p><button type="button" class="btn wide" data-g="start">開始遊戲</button>';
+  } else b='<p id="gmsg" class="gmsg"></p>';
+  $('gbody').innerHTML=b;
+  if(step==='setup'){ drawPerson($('gp_m'),'m'); drawPerson($('gp_f'),'f'); pickGender(gate.gender); if(gate.preName) $('g_name').value=gate.preName; }
+  if(msg) gmsg(msg,bad);
+}
+function gateHide(){ gate.step='none'; $('gate').style.display='none'; }
+function pickGender(g){ gate.gender=g||''; Array.prototype.forEach.call(document.querySelectorAll('.gchoice'),function(el){ el.classList.toggle('on',el.dataset.g===gate.gender); }); }
+$('gate').addEventListener('click',function(e){
+  var b=e.target.closest('[data-g]'); if(!b||b.disabled) return; var g=b.dataset.g; sfx('tap');
+  if(SET.music&&!musicOn) setMusic(true);
+  if(g==='guest') enterGuest();
+  else if(g==='m'||g==='f') pickGender(g);
+  else if(g==='signin'||g==='signup') doAuth(g);
+  else if(g==='start') completeSetup();
+});
+$('gate').addEventListener('keydown',function(e){
+  if(e.key!=='Enter') return;
+  if(e.target.id==='g_pass') doAuth('signin'); else if(e.target.id==='g_name') completeSetup();
+});
+function doAuth(kind){
+  if(authBusy||!sb) return;
+  var em=(($('g_email')||{}).value||'').trim(), pw=($('g_pass')||{}).value||'';
+  if(!em||!pw){ gmsg('請輸入信箱和密碼',1); return; }
+  if(pw.length<6){ gmsg('密碼至少要 6 個字元',1); return; }
+  authBusy=true; gmsg(kind==='signin'?'登入中…':'註冊中…');
+  var pr=kind==='signin'?sb.auth.signInWithPassword({email:em,password:pw}):sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});
+  pr.then(function(r){
+    authBusy=false;
+    if(r.error){ gmsg(authErr(r.error.message),1); return; }
+    var se=r.data&&r.data.session;
+    if(se){ user=se.user||r.data.user; onSignedIn(); return; }
+    if(kind==='signup'&&r.data&&r.data.user&&r.data.user.identities&&r.data.user.identities.length===0){ gmsg('這個信箱已經註冊過，直接登入就好',1); return; }
+    gmsg('註冊成功！請到信箱點確認信裡的連結，確認後回來按「登入」。');
+  },function(e){ authBusy=false; gmsg(authErr(e&&e.message),1); });
+}
+function onSignedIn(){
+  gateShow('loading','讀取你的農場…');
+  var uid=user.id;
+  Promise.all([
+    sb.from('profiles').select('name,gender').eq('id',uid).maybeSingle(),
+    sb.from('lots').select('lot_id').eq('owner',uid).eq('kind','home').maybeSingle(),
+    sb.from('saves').select('data').eq('user_id',uid).maybeSingle()
+  ]).then(function(rs){
+    var bad=rs.filter(function(r){ return r.error; })[0];
+    if(bad){ gateShow('login','讀取資料失敗：'+authErr(bad.error.message),1); return; }
+    var prof=rs[0].data, home=rs[1].data, cl=rs[2].data&&rs[2].data.data;
+    gate.pending=validSave(cl)?cl:null;
+    if(!prof||!prof.name||!prof.gender||!home||!LOTMAP[home.lot_id]){ gate.preName=prof&&prof.name||''; gate.gender=prof&&prof.gender||''; gateShow('setup'); return; }
+    SAVE_KEY='lazyleaf-acct-'+uid;
+    var loc=Store.load(); if(!validSave(loc)||loc.owner!==uid) loc=null;
+    var pick=(gate.pending&&loc)?((loc.seenAt||0)>(gate.pending.seenAt||0)?loc:gate.pending):(gate.pending||loc||newPlayer(home.lot_id));
+    startAccount(pick,prof.name,prof.gender,home.lot_id);
+  },function(e){ gateShow('login',authErr(e&&e.message),1); });
+}
+function startAccount(data,name,gender,home){
+  var away=data.seenAt?Date.now()-data.seenAt:0;
+  S=data; normalize(); S.owner=user.id; S.name=name; S.gender=gender; S.home=home;
+  Store.save(S); cloudSave(true); enterGame(away);
+}
+function claimHome(){
+  return sb.from('lots').select('lot_id').eq('owner',user.id).eq('kind','home').maybeSingle().then(function(r){
+    if(r.data) return r.data.lot_id;
+    return sb.from('lots').select('lot_id').then(function(r2){
+      var taken={}; (r2.data||[]).forEach(function(x){ taken[x.lot_id]=1; });
+      var cand=HOMEPOOL.filter(function(l){ return !taken[l.n]; }), i=0;
+      for(var k=cand.length-1;k>0;k--){ var j=Math.floor(Math.random()*(k+1)), tmp=cand[k]; cand[k]=cand[j]; cand[j]=tmp; }
+      function tryNext(){
+        if(i>=cand.length||i>=8) return null;
+        var l=cand[i++];
+        return sb.from('lots').insert({lot_id:l.n,owner:user.id,kind:'home'}).then(function(r3){
+          if(!r3.error) return l.n;
+          if(r3.error.code==='23505') return sb.from('lots').select('lot_id').eq('owner',user.id).eq('kind','home').maybeSingle().then(function(r4){ return r4.data?r4.data.lot_id:tryNext(); });
+          throw r3.error;
+        });
+      }
+      return tryNext();
+    });
+  });
+}
+function completeSetup(){
+  if(authBusy) return;
+  var nm=(($('g_name')||{}).value||'').trim();
+  if(nm.length<2||nm.length>12){ gmsg('名稱要 2 到 12 個字',1); return; }
+  if(!gate.gender){ gmsg('選一個性別',1); return; }
+  authBusy=true; gmsg('建立你的角色…');
+  sb.from('profiles').upsert({id:user.id,name:nm,gender:gate.gender,level:1,seen_at:new Date().toISOString()}).then(function(r){
+    if(r.error){ authBusy=false; gmsg(/duplicate|unique/i.test(r.error.message)?'這個名字已經有人用了，換一個':authErr(r.error.message),1); return; }
+    gmsg('幫你在小鎮上找一塊地…');
+    return claimHome().then(function(lot){
+      authBusy=false;
+      if(lot==null||!LOTMAP[lot]){ gmsg('暫時找不到空地，請稍後再試',1); return; }
+      SAVE_KEY='lazyleaf-acct-'+user.id;
+      var isNew=!gate.pending;
+      startAccount(gate.pending||newPlayer(lot),nm,gate.gender,lot);
+      if(isNew) setTimeout(function(){ modal('star','歡迎來到懶草農場',['你分到了小鎮上的「'+LOTMAP[lot].name+'」，3×3 格。','起手有 100 金幣和 10 顆懶懶綠種子。','點空地就能種。按「去小鎮」可以看到你的地在哪裡。'],[['開始種田']]); },300);
+    });
+  }).catch(function(e){ authBusy=false; gmsg(authErr(e&&e.message),1); });
+}
+var bootAway=0;
+function enterGuest(){
+  var away=bootAway; bootAway=0;
+  if(S.owner){ SAVE_KEY=GUEST_KEY; var g=Store.load(); S=validSave(g)?g:fresh(); normalize(); away=0; }
+  enterGame(away);
+}
+function enterGame(away){
+  gateHide(); ensureHome(); syncLook(); hud(); refreshPanel();
+  if(scene==='town') setScene('town');
+  if(user){ loadWorld(true); loadFriends(); heartbeat(); }
+  if(away) welcome(away);
+  if(S.stats.harvest===0&&!planted().length) setTimeout(function(){ toast('點一塊空地種下第一株'); },600);
+}
+function logout(){
+  cloudSave(true);
+  sb.auth.signOut().then(function(){},function(){});
+  user=null; WORLD={lots:{},prof:{},home:{},at:0}; FR={mine:[],fans:[],msg:''}; cloudMsg=''; authMsg='';
+  SAVE_KEY=GUEST_KEY; var g=Store.load(); S=validSave(g)?g:fresh(); normalize(); ensureHome(); syncLook();
+  if(tab) closePanel(); if(scene==='town') setScene('farm'); hud();
+  gateShow('login','已登出');
+}
+function boot(){
+  $('glogo').src=ICON.lazy;
+  if(!sb){ gateShow('login'); return; }
+  gateShow('loading','連線中…');
+  var done=false, to=setTimeout(function(){ if(!done){ done=true; gateShow('login','連線很慢，可以先試玩，或稍後再登入',1); } },8000);
+  sb.auth.getSession().then(function(r){
+    if(done) return; done=true; clearTimeout(to);
+    var se=r.data&&r.data.session; if(se){ user=se.user; onSignedIn(); } else gateShow('login');
+  },function(){ if(done) return; done=true; clearTimeout(to); gateShow('login'); });
+}
+
+/* 雲端存檔 */
+function cloudSave(force){
+  if(!sb||!user||S.owner!==user.id||cloudBusy) return;
+  var now=Date.now(); if(!force&&now-lastCloud<60000) return;
+  lastCloud=now; cloudBusy=true;
+  sb.from('saves').upsert({user_id:user.id,data:S,updated_at:new Date().toISOString()}).then(function(r){
+    cloudBusy=false; var t=new Date();
+    cloudMsg=r.error?'雲端存檔失敗，稍後會再試':'上次同步 '+t.getHours()+':'+('0'+t.getMinutes()).slice(-2);
+    if(tab==='acct') refreshPanel();
+  },function(){ cloudBusy=false; cloudMsg='雲端存檔失敗，稍後會再試'; });
+}
+function heartbeat(){ if(sb&&user&&S.name) sb.from('profiles').update({level:S.lvl,seen_at:new Date().toISOString()}).eq('id',user.id).then(function(){},function(){}); }
+
+/* 其他玩家：誰有哪塊地、名字和等級 */
+var WORLD={lots:{},prof:{},home:{},at:0};
+function loadWorld(force){
+  if(!sb||!user) return;
+  var now=Date.now(); if(!force&&now-WORLD.at<60000) return; WORLD.at=now;
+  Promise.all([sb.from('lots').select('lot_id,owner,kind'),sb.from('profiles').select('id,name,gender,level,seen_at')]).then(function(rs){
+    if(rs[0].error||rs[1].error) return;
+    var pr={}, lots={}, home={};
+    (rs[1].data||[]).forEach(function(p){ pr[p.id]=p; });
+    (rs[0].data||[]).forEach(function(l){ lots[l.lot_id]={owner:l.owner,kind:l.kind}; if(l.kind==='home') home[l.owner]=l.lot_id; });
+    WORLD.prof=pr; WORLD.lots=lots; WORLD.home=home;
+    if(tab==='friends'||tab==='lot') refreshPanel();
+  },function(){});
+}
+/* 好友：mine 是我加的人，fans 是加了我的人；兩邊都有就是互相好友 */
+var FR={mine:[],fans:[],msg:''}, frDelArm=null;
+function isFriend(id){ return FR.mine.indexOf(id)>=0; }
+function loadFriends(){
+  if(!sb||!user) return;
+  sb.from('friends').select('user_id,friend_id').or('user_id.eq.'+user.id+',friend_id.eq.'+user.id).then(function(r){
+    if(r.error) return; var mine=[], fans=[];
+    (r.data||[]).forEach(function(x){ if(x.user_id===user.id) mine.push(x.friend_id); else fans.push(x.user_id); });
+    FR.mine=mine; FR.fans=fans;
+    if(tab==='friends'||tab==='upg') refreshPanel();
+  },function(){});
+}
+function seenText(ts){
+  if(!ts) return ''; var d=(Date.now()-new Date(ts).getTime())/1000;
+  if(d<300) return '在線上'; if(d<3600) return Math.floor(d/60)+' 分鐘前上線'; if(d<86400) return Math.floor(d/3600)+' 小時前上線'; return Math.floor(d/86400)+' 天前上線';
+}
+function addFriendByName(){
+  var nm=(($('fr_name')||{}).value||'').trim();
+  if(!nm){ FR.msg='輸入朋友的角色名稱'; refreshPanel(); return; }
+  if(nm===S.name){ FR.msg='這是你自己的名字'; refreshPanel(); return; }
+  FR.msg='搜尋中…'; refreshPanel();
+  sb.from('profiles').select('id,name').eq('name',nm).maybeSingle().then(function(r){
+    if(r.error||!r.data){ FR.msg=r.error?authErr(r.error.message):'找不到「'+nm+'」，名字要完全一樣'; refreshPanel(); return; }
+    addFriendId(r.data.id,r.data.name);
+  },function(e){ FR.msg=authErr(e&&e.message); refreshPanel(); });
+}
+function addFriendId(id,name){
+  if(!user||id===user.id) return;
+  if(isFriend(id)){ FR.msg='已經是好友了'; refreshPanel(); return; }
+  sb.from('friends').insert({user_id:user.id,friend_id:id}).then(function(r){
+    if(r.error&&r.error.code!=='23505'){ FR.msg=authErr(r.error.message); refreshPanel(); return; }
+    FR.msg=''; if(!isFriend(id)) FR.mine.push(id); sfx('coin');
+    toast('加了「'+(name||(WORLD.prof[id]||{}).name||'')+'」好友'); loadFriends(); loadWorld(true); refreshPanel();
+  },function(e){ FR.msg=authErr(e&&e.message); refreshPanel(); });
+}
+function removeFriend(id){ sb.from('friends').delete().eq('user_id',user.id).eq('friend_id',id).then(function(){ FR.mine=FR.mine.filter(function(x){ return x!==id; }); refreshPanel(); },function(){}); }
+function visitFriend(id){
+  var l=LOTMAP[WORLD.home[id]];
+  if(!l){ toast('還找不到他的農場，等一下再試'); loadWorld(true); return; }
+  if(tab) closePanel(); if(scene!=='town') setScene('town');
+  town.pending=l; routeTo(l.door); toast('走去「'+((WORLD.prof[id]||{}).name||'')+'」的農場');
 }
 function showTab(t){ tab=null; openTab(t); }
 function closePanel(){ fishReset(); if(tab) openTab(tab); }
@@ -633,7 +913,7 @@ function refreshPanel(){
       var lock=s.gen?have<1:S.lvl<s.lvl;
       h+='<div class="row'+(lock?' locked':'')+'"><div class="sw" style="background:'+s.color+'"></div><div class="info"><strong>'+s.name+(s.gen?' ×'+have:'')+(inSeason(s,now)?'　<span class="up" style="font-size:12px;font-weight:400">當季：長得快、賣得貴</span>':'')+'</strong><small>'+
         (s.gen?(have?'配種得到的種子':'種子用完了，到工坊配種')+'，成長 '+fmt(s.time/speed())+'，行情約 '+s.base
-              :(lock?'LV '+s.lvl+' 解鎖':'種子 '+s.cost+' 金幣，成長 '+fmt(s.time/speed())+'，行情約 '+s.base))+'</small><small>【'+s.tname+'】'+s.tdesc+'</small></div>'+
+              :(lock?'LV '+s.lvl+' 解鎖':(have?'有免費種子 '+have+' 顆，用完每顆 '+s.cost+' 金幣':'種子 '+s.cost+' 金幣')+'，成長 '+fmt(s.time/speed())+'，行情約 '+s.base))+'</small><small>【'+s.tname+'】'+s.tdesc+'</small></div>'+
         '<button class="btn" data-act="seed" data-id="'+s.id+'"'+(lock||S.seed===s.id?' disabled':'')+'>'+(S.seed===s.id?'使用中':'選這個')+'</button></div>';
     });
   } else if(tab==='bag'){
@@ -676,7 +956,13 @@ function refreshPanel(){
       for(ci=0;ci<area;ci++) cells+='<i style="width:14px;height:14px;background:'+cc+';display:block"></i>';
       h+='<div class="row"><div style="display:grid;grid-template-columns:repeat('+L.sw+',14px);gap:2px;padding:8px;background:#4d7a5a;border:2px solid '+(own?'#f5c451':'#c9a27a')+'">'+cells+'</div><div class="info"><strong>'+L.sw+'×'+L.sh+' 格，共 '+area+' 格</strong><small>地段：'+zone+'。在地圖上每塊地看起來一樣大，這裡是它實際的大小。</small></div></div>';
     }
-    if(L.type==='home'){
+    var lo=WORLD.lots[L.n], other=(lo&&!(user&&lo.owner===user.id))?lo:null, op=other?WORLD.prof[other.owner]:null;
+    if(other){
+      title=(op?op.name:'某位玩家')+(other.kind==='home'?' 的農場':' 的土地'); sub=other.kind==='home'?'玩家的農場':'玩家的土地';
+      h+='<div class="row"><img class="ava" alt="" src="'+avatar(op&&op.gender)+'"><div class="info"><strong>'+esc(op?op.name:'某位玩家')+(op?'　<span style="font-weight:400;font-size:12px;color:var(--muted)">LV '+op.level+'</span>':'')+'</strong><small>'+(op?seenText(op.seen_at):'')+'</small></div>'+
+        (isFriend(other.owner)?'<span class="up">好友</span>':'<button class="btn" data-act="fradd2" data-id="'+other.owner+'">加好友</button>')+'</div>';
+      h+='<div class="row"><div class="info"><small>'+(other.kind==='home'?'之後會開放進去參觀、幫忙澆水。':'這塊地已經有主人了。')+'</small></div></div>';
+    } else if(L.type==='home'){
       sub='居民';
       var fv=S.favor[L.npc]||0, stg=S.story[L.npc]||0, ST=STORIES[L.npc]||[];
       h+='<div class="row"><div class="info"><strong>'+L.npc+'在這裡</strong><small>'+L.desc+'</small></div></div>';
@@ -760,7 +1046,7 @@ function refreshPanel(){
     title='地政所'; sub='持有 '+own+' / 9 塊地';
     if(own<9) h+='<div class="row"><div class="info"><strong>農場第 '+(own+1)+' 塊地</strong><small>買下後回農場就能種</small></div><button class="btn" data-act="buyland"'+(S.coins>=PLOT_COST[own]?'':' disabled')+'>'+PLOT_COST[own]+' 金幣</button></div>';
     else h+='<div class="row"><div class="info"><strong>農場的地都買齊了</strong><small>真正的大地主。</small></div></div>';
-    h+='<div class="row locked"><div class="info"><strong>街上的空地</strong><small>之後接上帳號，可以在街上買地、看到朋友的農場。</small></div><span>即將開放</span></div>';
+    h+='<div class="row"><div class="info"><strong>小鎮上的土地</strong><small>走到插著木牌的空地點一下，就能看大小、價格並買下。你在小鎮上有 '+Object.keys(S.land).length+' 塊地。</small></div></div>';
   } else if(tab==='pets'){
     title='寵物'; sub='養了 '+Object.keys(S.pets).length+' / '+PETS.length+' 隻';
     PETS.forEach(function(pt){
@@ -801,13 +1087,57 @@ function refreshPanel(){
     h+='<button class="btn wide" data-act="sellall"'+(total?'':' disabled')+'>全部賣出，收 '+total+' 金幣</button>';
     h+='<div class="row"><div class="info"><small>同一種賣越多價格越低，大約 8 分鐘回復一半。品質越高賣越貴。</small></div></div>';
   } else if(tab==='upg'){
-    title='更多'; sub='升級與設定';
+    var fanN=FR.fans.filter(function(id){ return !isFriend(id); }).length;
+    title='更多'; sub=user?'已登入':'試玩中';
+    h+='<div class="tiles"><button type="button" class="tile" data-act="go" data-id="acct"><b>帳號</b><small>'+(user?esc(S.name||''):'試玩中，點這裡登入')+'</small></button>'+
+      '<button type="button" class="tile" data-act="go" data-id="friends"><b>好友'+(fanN?'<i class="dot"></i>':'')+'</b><small>'+(user?FR.mine.length+' 位好友':'登入後可用')+'</small></button>'+
+      '<button type="button" class="tile" data-act="go" data-id="settings"><b>設定</b><small>聲音、畫面</small></button></div>';
+    h+='<div class="sec">升級</div>';
     Object.keys(UPG).forEach(function(k){
       var u=UPG[k], l=S.upg[k], max=l>=u.max;
       h+='<div class="row"><div class="info"><strong>'+u.name+(u.max>1?'　'+l+'/'+u.max:'')+'</strong><small>'+u.desc+'</small></div>'+
         '<button class="btn" data-act="upg" data-id="'+k+'"'+(max||S.coins<u.cost[l]?' disabled':'')+'>'+(max?'已買滿':u.cost[l]+' 金幣')+'</button></div>';
     });
-    h+='<div class="row"><div class="info"><strong>Lofi 背景音樂</strong><small>即時合成，不佔流量</small></div><button class="btn alt" data-act="music">'+(musicOn?'關掉':'播放')+'</button></div>';
+  } else if(tab==='acct'){
+    title='帳號'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
+    if(!user){
+      sub='試玩模式';
+      h+='<div class="row"><div class="info"><strong>你現在是試玩模式</strong><small>進度只存在這台裝置。登入後進度會存到雲端，換手機也能接著玩，也能加好友。</small></div><button class="btn" data-act="relogin">登入</button></div>';
+    } else {
+      sub=S.name||'';
+      h+='<div class="row"><img class="ava" alt="" src="'+avatar(S.gender)+'"><div class="info"><strong>'+esc(S.name)+'　<span style="font-weight:400;font-size:12px;color:var(--muted)">'+(S.gender==='f'?'女生':'男生')+'</span></strong><small>'+esc(user.email)+'</small><small>你的農場：'+(LOTMAP[S.home]?LOTMAP[S.home].name+'（3×3 格）':'')+'</small></div></div>';
+      h+='<div class="row"><div class="info"><strong>雲端存檔</strong><small>'+(cloudMsg||'每分鐘自動同步，切到背景時也會存')+'</small></div><button class="btn" data-act="syncnow">立即同步</button></div>';
+      h+='<div class="row"><div class="info"><strong>改名字</strong><input class="inp" id="au_name" type="text" maxlength="12" placeholder="2 到 12 個字">'+(authMsg?'<small class="down">'+esc(authMsg)+'</small>':'')+'</div><button class="btn alt" data-act="setname">儲存</button></div>';
+      h+='<div class="row"><div class="info"><small>登出後會回到登入畫面，帳號進度留在雲端。</small></div><button class="btn ghost" data-act="signout">登出</button></div>';
+    }
+  } else if(tab==='friends'){
+    title='好友'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
+    if(!user){
+      sub='';
+      h+='<div class="row"><div class="info"><strong>登入後才能加好友</strong><small>試玩模式的農場別人看不到。</small></div><button class="btn" data-act="relogin">登入</button></div>';
+    } else {
+      sub=FR.mine.length+' 位好友';
+      h+='<div class="row"><div class="info"><strong>你的名字：'+esc(S.name)+'</strong><small>把這個名字告訴朋友，他就能加你。</small><input class="inp" id="fr_name" type="text" maxlength="12" placeholder="輸入朋友的角色名稱">'+(FR.msg?'<small class="down">'+esc(FR.msg)+'</small>':'')+'</div><button class="btn" data-act="fradd">加好友</button></div>';
+      var fans=FR.fans.filter(function(id){ return !isFriend(id); });
+      if(fans.length){ h+='<div class="sec">想加你好友</div>';
+        fans.forEach(function(id){ var p=WORLD.prof[id];
+          h+='<div class="row"><img class="ava" alt="" src="'+avatar(p&&p.gender)+'"><div class="info"><strong>'+esc(p?p.name:'…')+'</strong><small>'+(p?'LV '+p.level+'・'+seenText(p.seen_at):'')+'</small></div><button class="btn alt" data-act="fradd2" data-id="'+id+'">加回去</button></div>'; }); }
+      h+='<div class="sec">我的好友</div>';
+      if(!FR.mine.length) h+='<div class="row"><div class="info"><small>還沒有好友。朋友在小鎮上的農場會用藍色框標出來。</small></div></div>';
+      FR.mine.forEach(function(id){ var p=WORLD.prof[id], mutual=FR.fans.indexOf(id)>=0;
+        h+='<div class="row"><img class="ava" alt="" src="'+avatar(p&&p.gender)+'"><div class="info"><strong>'+esc(p?p.name:'…')+(p?'　<span style="font-weight:400;font-size:12px;color:var(--muted)">LV '+p.level+'</span>':'')+'</strong><small>'+(p?seenText(p.seen_at)+'・':'')+(mutual?'互相是好友':'等他加你')+'</small></div>'+
+          '<button class="btn" data-act="frvisit" data-id="'+id+'">找他家</button><button class="btn ghost" style="min-width:0;margin-left:6px;padding:10px 8px" data-act="frdel" data-id="'+id+'">'+(frDelArm===id?'確定':'刪除')+'</button></div>'; });
+    }
+  } else if(tab==='settings'){
+    title='設定'; sub='只影響這台裝置'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
+    var tg=function(k,name,desc){ return '<div class="row"><div class="info"><strong>'+name+'</strong><small>'+desc+'</small></div><button class="btn'+(SET[k]?'':' ghost')+'" data-act="set" data-id="'+k+'">'+(SET[k]?'開':'關')+'</button></div>'; };
+    h+='<div class="sec">聲音</div>'+tg('music','背景音樂','即時合成的 lofi，不佔流量')+
+      '<div class="row"><div class="info"><small>音樂音量</small><input class="rng" id="set_mvol" type="range" min="0" max="100" value="'+Math.round(SET.mvol*100)+'"></div></div>'+
+      tg('sfx','音效','種植、澆水、收成、賣東西的聲音')+
+      '<div class="row"><div class="info"><small>音效音量</small><input class="rng" id="set_svol" type="range" min="0" max="100" value="'+Math.round(SET.svol*100)+'"></div></div>'+
+      '<div class="sec">畫面</div>'+tg('fx','天氣特效','下雨、起霧、熱浪、彩虹的畫面效果')+tg('labels','小鎮地名','在小鎮地圖上顯示建築和朋友農場的名字')+
+      '<div class="sec">進度</div><div class="row"><div class="info"><strong>重新開始</strong><small>'+(user?'帳號進度會清空（雲端也會覆蓋），買的小鎮土地會釋出，農場位置不變。':'清空這台裝置上的試玩進度。')+'</small></div><button class="btn ghost" data-act="reset">'+(resetArm?'再按一次確定':'重新開始')+'</button></div>'+
+      '<div class="row"><div class="info"><small>懶草農場 v0.9</small></div></div>';
   } else if(tab==='ach'){
     var done=ACH.filter(function(a){return S.ach[a.id];}).length;
     title='任務與成就'; sub='成就 '+done+' / '+ACH.length;
@@ -821,7 +1151,6 @@ function refreshPanel(){
     ACH.forEach(function(a){
       h+='<div class="row'+(S.ach[a.id]?'':' locked')+'"><div class="info"><strong>'+a.name+'</strong><small>'+a.desc+'，獎勵 '+a.reward+' 金幣</small></div><span class="'+(S.ach[a.id]?'up':'')+'">'+(S.ach[a.id]?'已達成':'未達成')+'</span></div>';
     });
-    h+='<button class="btn wide ghost" data-act="reset">'+(resetArm?'再按一次，確定刪除進度':'重新開始（刪除進度）')+'</button>';
   }
   $('ptitle').textContent=title; $('psub').textContent=sub; $('plist').innerHTML=h;
 }
@@ -869,7 +1198,7 @@ function bagList(){
 }
 $('plist').addEventListener('click',function(e){
   var b=e.target.closest('button[data-act]'); if(!b||b.disabled) return;
-  var act=b.dataset.act, id=b.dataset.id, now=Date.now();
+  var act=b.dataset.act, id=b.dataset.id, now=Date.now(), c0=S.coins;
   if(act==='seed'){ S.seed=id; toast('換成「'+SMAP[id].name+'」種子'); }
   else if(act==='sell'||act==='sellall'){
     var got=0;
@@ -926,9 +1255,39 @@ $('plist').addEventListener('click',function(e){
   else if(act==='collect'){ if(S.job&&now>=S.job.until){ S.goods.push({t:S.job.t,v:S.job.v,q:S.job.q}); toast(GOODS[S.job.t].name+'做好了，到市場賣'); S.job=null; } }
   else if(act==='sellgoods'){ var gv=goodsValue(); if(gv){ S.goods=[]; addCoins(gv); toast('賣出加工品，進帳 '+gv+' 金幣'); } }
   else if(act==='music'){ toggleMusic(); }
+  else if(act==='signout'){ logout(); }
+  else if(act==='syncnow'){ cloudMsg='同步中…'; lastCloud=0; cloudSave(true); }
+  else if(act==='relogin'){ closePanel(); gateShow('login'); }
+  else if(act==='go'){ showTab(id); }
+  else if(act==='back'){ showTab('upg'); }
+  else if(act==='set'){ SET[id]=!SET[id]; saveSet(); if(id==='music') setMusic(SET.music); updateLabels(); }
+  else if(act==='fradd'){ addFriendByName(); }
+  else if(act==='fradd2'){ addFriendId(id); }
+  else if(act==='frvisit'){ visitFriend(id); }
+  else if(act==='frdel'){ if(frDelArm!==id) frDelArm=id; else { frDelArm=null; removeFriend(id); } }
+  else if(act==='setname'){
+    var nm=(($('au_name')||{}).value||'').trim();
+    if(nm.length<2||nm.length>12){ authMsg='名稱要 2 到 12 個字'; }
+    else if(sb&&user){ authMsg='儲存中…';
+      sb.from('profiles').update({name:nm}).eq('id',user.id).then(function(r){
+        if(r.error) authMsg=/duplicate|unique/i.test(r.error.message)?'這個名字已經有人用了':authErr(r.error.message);
+        else { S.name=nm; authMsg=''; toast('名字改成「'+nm+'」'); cloudSave(true); loadWorld(true); }
+        hud(); refreshPanel();
+      },function(e){ authMsg=authErr(e&&e.message); refreshPanel(); }); }
+  }
   else if(act==='buylot'){
     var b1=curLot;
-    if(b1&&b1.type==='sale'&&!S.land[b1.n]&&S.coins>=b1.price){ S.coins-=b1.price; S.land[b1.n]={b:null,t:now}; toast('買下「'+b1.name+'」了，可以蓋東西'); }
+    if(b1&&b1.type==='sale'&&!S.land[b1.n]&&b1.n!==S.home&&!WORLD.lots[b1.n]&&S.coins>=b1.price){
+      if(sb&&user){
+        toast('辦理過戶中…');
+        sb.from('lots').insert({lot_id:b1.n,owner:user.id,kind:'buy'}).then(function(r){
+          if(r.error){ sfx('err'); toast(r.error.code==='23505'?'這塊地剛剛被別人買走了':'購買失敗：'+authErr(r.error.message)); loadWorld(true); return; }
+          if(S.coins<b1.price){ sb.from('lots').delete().eq('lot_id',b1.n).eq('owner',user.id).then(function(){},function(){}); toast('金幣不夠'); return; }
+          S.coins-=b1.price; S.land[b1.n]={b:null,t:Date.now()}; WORLD.lots[b1.n]={owner:user.id,kind:'buy'};
+          sfx('coin'); toast('買下「'+b1.name+'」了，可以蓋東西'); hud(); refreshPanel(); Store.save(S); cloudSave(true);
+        },function(e){ toast(authErr(e&&e.message)); });
+      } else { S.coins-=b1.price; S.land[b1.n]={b:null,t:now}; toast('買下「'+b1.name+'」了，可以蓋東西'); }
+    }
   }
   else if(act==='build'){
     var b2=curLot, o2=b2&&S.land[b2.n], d2=BUILDINGS.filter(function(x){return x.id===id;})[0];
@@ -1010,10 +1369,24 @@ $('plist').addEventListener('click',function(e){
     var li=-1; S.plots.forEach(function(p,k){ if(li<0&&!p.u) li=k; });
     if(li>=0&&S.coins>=PLOT_COST[li]){ S.coins-=PLOT_COST[li]; S.plots[li].u=true; toast('新的一塊地到手，回農場看看'); }
   }
-  else if(act==='reset'){ if(!resetArm){ resetArm=true; } else { Store.clear(); S=fresh(); normalize(); resetArm=false; toast('進度已重置'); } }
+  else if(act==='reset'){
+    if(!resetArm){ resetArm=true; }
+    else {
+      var keep={home:S.home,name:S.name,gender:S.gender,owner:S.owner};
+      if(sb&&user) sb.from('lots').delete().eq('owner',user.id).eq('kind','buy').then(function(){ loadWorld(true); },function(){});
+      Store.clear(); S=fresh(); normalize(); for(var kk in keep) if(keep[kk]) S[kk]=keep[kk];
+      resetArm=false; syncLook(); toast('進度已重置'); cloudSave(true);
+    }
+  }
   if(act!=='reset') resetArm=false;
+  sfx(S.coins>c0?'coin':'tap');
   checkAch(); hud(); refreshPanel(); Store.save(S);
 });
+$('plist').addEventListener('input',function(e){
+  var t=e.target; if(t.id==='set_mvol') SET.mvol=t.value/100; else if(t.id==='set_svol') SET.svol=t.value/100; else return;
+  applyVol(); saveSet();
+});
+$('plist').addEventListener('change',function(e){ if(e.target.id==='set_svol') sfx('coin'); });
 $('tabs').addEventListener('click',function(e){ var b=e.target.closest('button[data-tab]'); if(b) openTab(b.dataset.tab); });
 $('seedchip').addEventListener('click',function(){ openTab('seeds'); });
 $('go').addEventListener('click',function(){ setScene(scene==='farm'?'town':'farm'); });
@@ -1029,7 +1402,7 @@ function modal(art,title,lines,btns){
   var box=$('mbtns'); box.innerHTML='';
   btns.forEach(function(b,i){
     var el=document.createElement('button'); el.type='button'; el.className='btn'+(i?' alt':''); el.textContent=b[0];
-    el.addEventListener('click',function(){ closeModal(); if(b[1]) b[1](); checkAch(); hud(); refreshPanel(); Store.save(S); });
+    el.addEventListener('click',function(){ sfx('tap'); closeModal(); if(b[1]) b[1](); checkAch(); hud(); refreshPanel(); Store.save(S); });
     box.appendChild(el);
   });
 }
@@ -1095,7 +1468,7 @@ function welcome(away){
 }
 var nextEvent=Date.now()+240000+Math.random()*120000;
 function maybeEvent(now){
-  if(modalOpen||tab||now<nextEvent) return;
+  if(modalOpen||tab||gateOn()||now<nextEvent) return;
   nextEvent=now+480000+Math.random()*420000;
   var pool=['cat','cat','cat','cat','cat','granny','granny','granny','granny','merchant','merchant','merchant'];
   if(planted().length){ pool.push('police','police','police','police','police','ufo','ufo','ufo'); }
@@ -1123,15 +1496,44 @@ function schedule(){
     nextBeat+=spb; beat++;
   }
 }
-function toggleMusic(){
+var sfxBus=null;
+function applyVol(){ if(master) master.gain.value=0.9*SET.mvol; if(sfxBus) sfxBus.gain.value=SET.svol; }
+function ensureAudio(){
+  if(AC) return true;
   try{
-    if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); var lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1100;
-      master=AC.createGain(); master.gain.value=0.9; master.connect(lp); lp.connect(AC.destination); }
-    musicOn=!musicOn;
-    if(musicOn){ AC.resume(); nextBeat=AC.currentTime+0.1; beat=0; mTimer=setInterval(schedule,120); }
-    else { clearInterval(mTimer); AC.suspend(); }
-  }catch(err){ toast('這個瀏覽器無法播放音樂'); }
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    var lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1100;
+    master=AC.createGain(); master.connect(lp); lp.connect(AC.destination);
+    sfxBus=AC.createGain(); sfxBus.connect(AC.destination); applyVol(); return true;
+  }catch(e){ AC=null; return false; }
 }
+function setMusic(on){
+  if(on===musicOn) return;
+  if(on&&!ensureAudio()){ toast('這個瀏覽器無法播放音樂'); return; }
+  musicOn=on;
+  if(on){ AC.resume(); nextBeat=AC.currentTime+0.1; beat=0; mTimer=setInterval(schedule,120); }
+  else clearInterval(mTimer);
+}
+function toggleMusic(){ SET.music=!musicOn; saveSet(); setMusic(SET.music); }
+function blip(f,d,g,type,when,slide){
+  var t=AC.currentTime+(when||0), o=AC.createOscillator(), a=AC.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+d);
+  a.gain.setValueAtTime(g,t); a.gain.exponentialRampToValueAtTime(0.0008,t+d); o.connect(a); a.connect(sfxBus); o.start(t); o.stop(t+d+0.02);
+}
+function sfx(k,q){
+  if(!SET.sfx||!ensureAudio()) return;
+  try{
+    if(AC.state!=='running') AC.resume();
+    if(k==='tap') blip(660,0.05,0.04,'square');
+    else if(k==='open') blip(440,0.07,0.04,'triangle',0,660);
+    else if(k==='plant') blip(220,0.14,0.12,'triangle',0,110);
+    else if(k==='water'){ blip(900,0.09,0.05,'sine',0,500); blip(700,0.09,0.04,'sine',0.06,400); }
+    else if(k==='harvest'){ var nt=[523,659,784,1047,1319,1568]; for(var i=0;i<=Math.min(5,1+(q||0));i++) blip(nt[i],0.12,0.06,'square',i*0.07); }
+    else if(k==='coin'){ blip(988,0.07,0.05,'square'); blip(1319,0.14,0.05,'square',0.07); }
+    else if(k==='err') blip(150,0.16,0.07,'sawtooth',0,110);
+  }catch(e){}
+}
+document.addEventListener('click',function(){ if(SET.music&&!musicOn) setMusic(true); },true);
 
 /* ---------- 主迴圈 ---------- */
 function resize(){
@@ -1154,9 +1556,11 @@ function tick(){
   if(broke){ S.coins+=10; toast('阿嬤看你可憐，塞了 10 金幣給你'); }
   checkAch(); hud(); if(tab==='market'||tab==='pets'||tab==='ach'||(tab==='lab'&&S.job)) refreshPanel(); maybeEvent(now);
   if(++ticks%5===0) Store.save(S);
+  if(ticks%60===0) cloudSave(false);
+  if(user&&ticks%300===0) heartbeat();
+  if(user&&scene==='town'&&ticks%120===0) loadWorld();
 }
-var awayMs=S.seenAt?Date.now()-S.seenAt:0, hiddenAt=0;
-setInterval(tick,1000); tick(); welcome(awayMs);
-document.addEventListener('visibilitychange',function(){ if(document.hidden){ hiddenAt=Date.now(); Store.save(S); } else { tick(); if(hiddenAt) welcome(Date.now()-hiddenAt); } });
-if(S.stats.harvest===0&&!planted().length) setTimeout(function(){ toast('點一塊空地種下第一株'); },600);
+var hiddenAt=0; bootAway=S.seenAt?Date.now()-S.seenAt:0;
+setInterval(tick,1000); tick(); boot();
+document.addEventListener('visibilitychange',function(){ if(document.hidden){ hiddenAt=Date.now(); Store.save(S); cloudSave(true); } else { tick(); if(hiddenAt&&!gateOn()) welcome(Date.now()-hiddenAt); } });
 })();
