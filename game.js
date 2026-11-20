@@ -674,8 +674,9 @@ function authErr(m){
   if(/already registered|already been registered/i.test(m)) return '這個信箱已經註冊過，直接登入就好';
   if(/at least 6|should be at least/i.test(m)) return '密碼至少要 6 個字元';
   if(/rate limit|too many|security purposes/i.test(m)) return '操作太頻繁，請等一下再試';
-  if(/valid email|invalid format|invalid.*email/i.test(m)) return '信箱格式不對';
-  if(/fetch|network|load failed/i.test(m)) return '連不到伺服器，檢查一下網路';
+  if(/valid email|invalid format|invalid.*email|email.*invalid/i.test(m)) return '這個信箱無法使用，請確認有沒有打錯';
+  if(/sending.*email|confirmation email/i.test(m)) return '確認信寄不出去，請過幾分鐘再試';
+  if(/fetch|network|load failed/i.test(m)) return location.hostname==='06-mtt.github.io'?'連不到伺服器，請檢查網路後再試一次':'這個版本連不到伺服器，請用 06-mtt.github.io/lazy-leaf-farm 開啟遊戲';
   return '發生錯誤：'+m;
 }
 function validSave(d){ return !!(d&&d.v===1&&d.plots&&d.plots.length===9); }
@@ -693,8 +694,9 @@ function gateShow(step,msg,bad){
     if(sb) b='<input class="inp" id="g_email" type="email" autocomplete="email" placeholder="電子信箱">'+
       '<input class="inp" id="g_pass" type="password" autocomplete="current-password" placeholder="密碼（至少 6 個字元）">'+
       '<div class="grow"><button type="button" class="btn" data-g="signin">登入</button><button type="button" class="btn alt" data-g="signup">註冊</button></div>';
-    b+='<p id="gmsg" class="gmsg"></p><button type="button" class="glink" data-g="guest">先試玩，不登入（進度只存在這台裝置）</button>';
-    if(!sb&&!msg){ msg='連不到伺服器，現在只能試玩。'; }
+    else b='<button type="button" class="btn wide" data-g="reload">重新載入</button>';
+    b+='<p id="gmsg" class="gmsg"></p>';
+    if(!sb&&!msg){ msg='遊戲沒有載入完整，請重新載入頁面。'; bad=1; }
   } else if(step==='setup'){
     b='<p class="gmsg" style="color:var(--cream)">幫你的角色取名字、選性別</p>'+
       '<input class="inp" id="g_name" type="text" maxlength="12" placeholder="角色名稱（2 到 12 個字）">'+
@@ -711,7 +713,7 @@ function pickGender(g){ gate.gender=g||''; Array.prototype.forEach.call(document
 $('gate').addEventListener('click',function(e){
   var b=e.target.closest('[data-g]'); if(!b||b.disabled) return; var g=b.dataset.g; sfx('tap');
   if(SET.music&&!musicOn) setMusic(true);
-  if(g==='guest') enterGuest();
+  if(g==='reload') location.reload();
   else if(g==='m'||g==='f') pickGender(g);
   else if(g==='signin'||g==='signup') doAuth(g);
   else if(g==='start') completeSetup();
@@ -824,7 +826,7 @@ function boot(){
   $('glogo').src=ICON.lazy;
   if(!sb){ gateShow('login'); return; }
   gateShow('loading','連線中…');
-  var done=false, to=setTimeout(function(){ if(!done){ done=true; gateShow('login','連線很慢，可以先試玩，或稍後再登入',1); } },8000);
+  var done=false, to=setTimeout(function(){ if(!done){ done=true; gateShow('login','連線很慢，請檢查網路後再登入',1); } },8000);
   sb.auth.getSession().then(function(r){
     if(done) return; done=true; clearTimeout(to);
     var se=r.data&&r.data.session; if(se){ user=se.user; onSignedIn(); } else gateShow('login');
@@ -1088,8 +1090,8 @@ function refreshPanel(){
     h+='<div class="row"><div class="info"><small>同一種賣越多價格越低，大約 8 分鐘回復一半。品質越高賣越貴。</small></div></div>';
   } else if(tab==='upg'){
     var fanN=FR.fans.filter(function(id){ return !isFriend(id); }).length;
-    title='更多'; sub=user?'已登入':'試玩中';
-    h+='<div class="tiles"><button type="button" class="tile" data-act="go" data-id="acct"><b>帳號</b><small>'+(user?esc(S.name||''):'試玩中，點這裡登入')+'</small></button>'+
+    title='更多'; sub='';
+    h+='<div class="tiles"><button type="button" class="tile" data-act="go" data-id="acct"><b>帳號</b><small>'+(user?esc(S.name||''):'點這裡登入')+'</small></button>'+
       '<button type="button" class="tile" data-act="go" data-id="friends"><b>好友'+(fanN?'<i class="dot"></i>':'')+'</b><small>'+(user?FR.mine.length+' 位好友':'登入後可用')+'</small></button>'+
       '<button type="button" class="tile" data-act="go" data-id="settings"><b>設定</b><small>聲音、畫面</small></button></div>';
     h+='<div class="sec">升級</div>';
@@ -1101,8 +1103,8 @@ function refreshPanel(){
   } else if(tab==='acct'){
     title='帳號'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
     if(!user){
-      sub='試玩模式';
-      h+='<div class="row"><div class="info"><strong>你現在是試玩模式</strong><small>進度只存在這台裝置。登入後進度會存到雲端，換手機也能接著玩，也能加好友。</small></div><button class="btn" data-act="relogin">登入</button></div>';
+      sub='';
+      h+='<div class="row"><div class="info"><strong>還沒登入</strong><small>登入後進度會存到雲端，換手機也能接著玩。</small></div><button class="btn" data-act="relogin">登入</button></div>';
     } else {
       sub=S.name||'';
       h+='<div class="row"><img class="ava" alt="" src="'+avatar(S.gender)+'"><div class="info"><strong>'+esc(S.name)+'　<span style="font-weight:400;font-size:12px;color:var(--muted)">'+(S.gender==='f'?'女生':'男生')+'</span></strong><small>'+esc(user.email)+'</small><small>你的農場：'+(LOTMAP[S.home]?LOTMAP[S.home].name+'（3×3 格）':'')+'</small></div></div>';
@@ -1114,7 +1116,7 @@ function refreshPanel(){
     title='好友'; h+='<button type="button" class="btn ghost back" data-act="back">← 更多</button>';
     if(!user){
       sub='';
-      h+='<div class="row"><div class="info"><strong>登入後才能加好友</strong><small>試玩模式的農場別人看不到。</small></div><button class="btn" data-act="relogin">登入</button></div>';
+      h+='<div class="row"><div class="info"><strong>登入後才能加好友</strong><small>登入後朋友才看得到你的農場。</small></div><button class="btn" data-act="relogin">登入</button></div>';
     } else {
       sub=FR.mine.length+' 位好友';
       h+='<div class="row"><div class="info"><strong>你的名字：'+esc(S.name)+'</strong><small>把這個名字告訴朋友，他就能加你。</small><input class="inp" id="fr_name" type="text" maxlength="12" placeholder="輸入朋友的角色名稱">'+(FR.msg?'<small class="down">'+esc(FR.msg)+'</small>':'')+'</div><button class="btn" data-act="fradd">加好友</button></div>';
@@ -1136,7 +1138,7 @@ function refreshPanel(){
       tg('sfx','音效','種植、澆水、收成、賣東西的聲音')+
       '<div class="row"><div class="info"><small>音效音量</small><input class="rng" id="set_svol" type="range" min="0" max="100" value="'+Math.round(SET.svol*100)+'"></div></div>'+
       '<div class="sec">畫面</div>'+tg('fx','天氣特效','下雨、起霧、熱浪、彩虹的畫面效果')+tg('labels','小鎮地名','在小鎮地圖上顯示建築和朋友農場的名字')+
-      '<div class="sec">進度</div><div class="row"><div class="info"><strong>重新開始</strong><small>'+(user?'帳號進度會清空（雲端也會覆蓋），買的小鎮土地會釋出，農場位置不變。':'清空這台裝置上的試玩進度。')+'</small></div><button class="btn ghost" data-act="reset">'+(resetArm?'再按一次確定':'重新開始')+'</button></div>'+
+      '<div class="sec">進度</div><div class="row"><div class="info"><strong>重新開始</strong><small>'+'帳號進度會清空（雲端也會覆蓋），買的小鎮土地會釋出，農場位置不變。'+'</small></div><button class="btn ghost" data-act="reset">'+(resetArm?'再按一次確定':'重新開始')+'</button></div>'+
       '<div class="row"><div class="info"><small>懶草農場 v0.9</small></div></div>';
   } else if(tab==='ach'){
     var done=ACH.filter(function(a){return S.ach[a.id];}).length;
