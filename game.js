@@ -983,7 +983,7 @@ function farmBar(){
     else { var ripe=0, dry=0; S.plots.forEach(function(p){ if(!isFarm(p)||!p.crop||!SMAP[p.crop]) return; if(isRipe(p)) ripe++; else if(now>=p.water) dry++; });
       if(ripe>1) h+='<button type="button" data-fb="harvest">全部收成 '+ripe+'</button>'; if(dry>1) h+='<button type="button" data-fb="water">全部澆水 '+dry+'</button>'; if(allOpen()) h+='<button type="button" data-fb="plan">規劃</button>'; }
   }
-  if(el._h!==h){ el.innerHTML=h; el._h=h; } el.classList.toggle('open',!!h);
+  if(el._h!==h){ el.innerHTML=h; el._h=h; } el.style.top=(cv.offsetTop+4)+'px'; el.classList.toggle('open',!!h);
 }
 $('farmbar').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b||modalOpen) return; var k=b.dataset.fb; sfx('tap'); closePicker();
