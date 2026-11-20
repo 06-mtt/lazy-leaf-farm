@@ -148,3 +148,6 @@ button:focus-visible{outline:3px solid var(--coin);outline-offset:-3px}
 .rng{width:100%;margin:8px 0 2px;accent-color:var(--leaf)}
 .ava{width:20px;height:32px;image-rendering:pixelated;flex:none}
 #lvl .nm{font-family:var(--body);font-size:12px;color:var(--muted);margin-left:6px}
+
+select.inp{appearance:none;-webkit-appearance:none}
+#wx{line-height:1.5}
